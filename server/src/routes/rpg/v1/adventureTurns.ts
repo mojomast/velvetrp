@@ -687,9 +687,11 @@ export function deliberateHoldNarration(
 ): string | null {
   if (!hold || !declarationNamesConcreteAction(declaration, presentNpcNames)) return null;
   if (holdNarrationIsWarranted(hold, declaration, presentNpcNames)) return holdNarration(hold);
-  return values.length > 0
-    ? narrationFallback(declaration, [], hold.reachablePlaces ? { reachablePlaces: hold.reachablePlaces } : undefined)
-    : null;
+  if (!values.length) return null;
+  const mergedContext: NarrationFallbackContext = { ...context };
+  if (!mergedContext.reachablePlaces?.length && hold.reachablePlaces)
+    mergedContext.reachablePlaces = hold.reachablePlaces;
+  return narrationFallback(declaration, [], mergedContext);
 }
 
 function checkReceiptProse(value: Extract<NarrationReceipt, { kind: "check" }>): string {
@@ -1702,11 +1704,28 @@ async function performNarration(
     });
     return { turn, text, source: "deterministic-fallback" };
   };
+  const holdActorState = hold
+    ? buildActorStateContext({
+        repo,
+        principal: principalId,
+        campaignId: turn.campaignId,
+        sessionId: turn.sessionId,
+        actorId: turn.actorId,
+      })
+    : null;
   const heldText = deliberateHoldNarration(
     hold && reachablePlaces.length && !hold.reachablePlaces?.length ? { ...hold, reachablePlaces } : hold,
     turn.declaration,
     safeReceipts ?? [],
     presentNpcNames,
+    hold && holdActorState
+      ? {
+          currentLocation: publicNarrationContext(repo, principalId, turn)?.currentLocation ?? null,
+          reachablePlaces,
+          health: holdActorState.health,
+          activeCombat: holdActorState.activeCombat,
+        }
+      : undefined,
   );
   if (heldText) {
     recordNarrationDebug(turn.turnId, {
@@ -1736,10 +1755,19 @@ async function performNarration(
   // call. A provider call already in flight for this turn is still awaited exactly as before.
   if (providerDisconnected && !recovered) {
     const publicContext = publicNarrationContext(repo, principalId, turn);
+    const actorState = buildActorStateContext({
+      repo,
+      principal: principalId,
+      campaignId: turn.campaignId,
+      sessionId: turn.sessionId,
+      actorId: turn.actorId,
+    });
     return recordFallback(
       narrationFallback(turn.declaration, safeReceipts, {
         currentLocation: publicContext?.currentLocation ?? null,
         reachablePlaces,
+        health: actorState.health,
+        activeCombat: actorState.activeCombat,
       }),
       "disconnected",
     );
