@@ -268,7 +268,7 @@ Interrupted durable operations reconcile against saved state instead of blindly 
 | `e2e/` | Deterministic and opt-in live browser workflows |
 | `docs/` | Product guides, API, operations, architecture, research, and roadmap |
 
-The [API reference](docs/api.md) owns the full contract: **183 counted** explicit trusted-local RPG operations plus feature discovery, excluding implicit HEAD aliases.
+The [API reference](docs/api.md) owns the full contract: **185 counted** explicit trusted-local RPG operations plus feature discovery, excluding implicit HEAD aliases.
 
 ## Data and privacy
 

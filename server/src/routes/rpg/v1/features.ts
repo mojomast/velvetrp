@@ -111,6 +111,8 @@ import type { ContentCatalogRepository } from "../../../repo/contentCatalogRepo.
 import type { AdventureTurnRepository } from "../../../repo/adventureTurnRepo.js";
 import { adventureTurnsHttpRoutes } from "./adventureTurns.js";
 import { campaignPlayHttpRoutes } from "./campaignPlay.js";
+import { campaignInviteHttpRoutes } from "./campaignInvites.js";
+import { getCampaignInviteRepository } from "../../../repo/campaignInviteRepo.js";
 import { campaignRoomActivationHttpRoutes } from "./campaignRoomActivation.js";
 import { campaignRoomParticipantHttpRoutes } from "./campaignRoomParticipant.js";
 import { campaignReadyCheckHttpRoutes } from "./campaignReadyCheck.js";
@@ -1285,6 +1287,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
       database: getRepositoryDatabase(),
     });
   };
+  const campaignInviteRepositoryAccessor = () => getCampaignInviteRepository();
   const startingLocationRepositoryAccessor = (): CampaignStartingLocationLaneRepository => {
     const repository = getCampaignRepository();
     assertCampaignStartingLocationRepository(repository);
@@ -1365,6 +1368,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   });
   await app.register(campaignPlayHttpRoutes, { campaignPlayRepositoryAccessor });
   await app.register(campaignReadyCheckHttpRoutes, { readyCheckRepositoryAccessor });
+  await app.register(campaignInviteHttpRoutes, { campaignInviteRepositoryAccessor });
   await app.register(campaignDmHttpRoutes, {
     repositoryAccessor: () => getCampaignRepository() as Repository,
     ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}),

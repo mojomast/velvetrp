@@ -7,8 +7,7 @@ import {
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { readRpgFeatureFlags } from "../../../features.js";
 import { sendApiProblem } from "../../../http/problem.js";
-
-const LOCAL_OWNER = "local-owner";
+import { getRequestPrincipal } from "../../../http/requestPrincipal.js";
 
 type CampaignPlayRepository = {
   getCampaignPlayBootstrap(principalId: string, campaignId: string, sessionId: string): CampaignPlayBootstrap | null;
@@ -50,10 +49,14 @@ export const campaignPlayHttpRoutes: FastifyPluginAsync<CampaignPlayHttpOptions>
     if (!sessionId.success) {
       return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_PLAY_NOT_FOUND", "Campaign play room not found");
     }
+    const principalId = getRequestPrincipal(request);
+    if (principalId === null) {
+      return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
+    }
     try {
       const bootstrap = options
         .campaignPlayRepositoryAccessor()
-        .getCampaignPlayBootstrap(LOCAL_OWNER, campaignId.data, sessionId.data);
+        .getCampaignPlayBootstrap(principalId, campaignId.data, sessionId.data);
       if (bootstrap === null) {
         return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_PLAY_NOT_FOUND", "Campaign play room not found");
       }

@@ -23,6 +23,7 @@ const currentSql = () =>
     "actorJourneySchema.sql",
     "campaignReadyCheckSchema.sql",
     "actorHandoffSchema.sql",
+    "campaignInviteSchema.sql",
   ]
     .map(asset)
     .join("\n");
