@@ -115,6 +115,10 @@ function BoundTacticalMapPanel({
     "loading" | "ready" | "missing" | "mismatch" | "previewing" | "moving" | "ambiguous" | "error"
   >("loading");
   const [notice, setNotice] = useState("");
+  const stateRef = useRef(state);
+  const snapshotRef = useRef(snapshot);
+  stateRef.current = state;
+  snapshotRef.current = snapshot;
   const [seed, setSeed] = useState(() => (locationId ? `velvet-map:${locationId}`.slice(0, 256) : "velvet-map"));
   const [kind, setKind] = useState<"dungeon" | "cave" | "arena" | "underwater">("arena");
   const generation = useRef(0);
@@ -147,25 +151,35 @@ function BoundTacticalMapPanel({
   }, []);
 
   const refresh = useCallback(
-    async (explicit = false) => {
+    async (explicit = false, quiet = false) => {
+      const quietRefresh =
+        quiet && !explicit && !busy.current && stateRef.current === "ready" && snapshotRef.current !== null;
       readController.current?.abort();
       const controller = new AbortController();
       readController.current = controller;
       const request = ++generation.current;
-      busy.current = false;
-      setSelection("");
-      setPreview(null);
-      setSpawnReview(null);
-      setReplaceReviewed(false);
-      setState("loading");
-      setNotice(
-        "Refreshing authoritative map; actions are locked and the previous view is stale. No command is being repeated.",
-      );
+      if (quietRefresh) {
+        // Lock previews and moves without clearing the current notice or canvas.
+        busy.current = true;
+      } else {
+        busy.current = false;
+        setSelection("");
+        setPreview(null);
+        setSpawnReview(null);
+        setReplaceReviewed(false);
+        setState("loading");
+        setNotice(
+          "Refreshing authoritative map; actions are locked and the previous view is stale. No command is being repeated.",
+        );
+      }
       // Preserve injected APIs; replace only the shared, non-abortable implementation.
       const read = api.getTacticalMap === getTacticalMap ? readTacticalMap : api.getTacticalMap;
       try {
         const value = await read(campaignId, sessionId, mode, actorId, controller.signal);
         if (request !== generation.current || controller.signal.aborted) return;
+        const finishQuiet = () => {
+          if (quietRefresh) busy.current = false;
+        };
         if (
           value.campaignId !== campaignId ||
           value.sessionId !== sessionId ||
@@ -175,10 +189,12 @@ function BoundTacticalMapPanel({
           setSnapshot(null);
           setState("error");
           setNotice("Tactical map encounter binding is stale or missing. Refresh combat binding before continuing.");
+          finishQuiet();
           return;
         }
         if (value.locationBinding && value.locationBinding.locationId !== locationId) {
           locationMismatch();
+          finishQuiet();
           return;
         }
         if (
@@ -189,13 +205,28 @@ function BoundTacticalMapPanel({
           setSnapshot(null);
           setState("error");
           setNotice("Tactical map token control is ambiguous. Commands are locked until an authoritative refresh.");
+          finishQuiet();
           return;
         }
+        const previous = snapshotRef.current;
         setSnapshot(value);
         setState("ready");
-        setNotice(explicit ? "Authoritative tactical map refreshed." : "Server-owned movement and visibility.");
+        if (quietRefresh) {
+          if (
+            previous &&
+            (previous.mapRevision !== value.mapRevision ||
+              previous.tokenRevision !== value.tokenRevision ||
+              previous.movement?.budgetFeet !== value.movement?.budgetFeet)
+          ) {
+            setPreview(null);
+          }
+        } else {
+          setNotice(explicit ? "Authoritative tactical map refreshed." : "Server-owned movement and visibility.");
+        }
+        finishQuiet();
       } catch (error) {
         if (request !== generation.current || controller.signal.aborted) return;
+        if (quietRefresh) busy.current = false;
         setSnapshot(null);
         if (error instanceof ApiError && error.status === 409 && error.code === "RPG_TACTICAL_MAP_LOCATION_MISMATCH") {
           locationMismatch();
@@ -223,12 +254,18 @@ function BoundTacticalMapPanel({
     ],
   );
 
+  const refreshKeySeen = useRef(refreshKey);
   useEffect(() => {
     void refresh();
     return () => {
       generation.current += 1;
       readController.current?.abort();
     };
+  }, [refresh]);
+  useEffect(() => {
+    if (refreshKeySeen.current === refreshKey) return;
+    refreshKeySeen.current = refreshKey;
+    void refresh(false, true);
   }, [refresh, refreshKey]);
   useEffect(() => {
     setLocationRefreshRequired(false);

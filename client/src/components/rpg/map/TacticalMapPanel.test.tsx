@@ -417,6 +417,26 @@ describe("TacticalMapPanel", () => {
     );
   });
 
+  it("keeps the move receipt visible when a live refreshKey poll reruns the map GET", async () => {
+    const client = api({
+      getTacticalMap: vi
+        .fn()
+        .mockResolvedValueOnce(snapshot)
+        .mockResolvedValue({ ...snapshot, tokenRevision: 5 }),
+    });
+    const view = render(<TacticalMapPanel {...props} api={client} />);
+    await screen.findByText(/60 feet available/);
+    fireEvent.click(screen.getByRole("button", { name: "2, 1" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm move" }));
+    expect(await screen.findByText("Token moved and exploration refreshed from the server.")).toBeTruthy();
+    const readsBeforePoll = client.getTacticalMap.mock.calls.length;
+    view.rerender(<TacticalMapPanel {...props} api={client} refreshKey={1} />);
+    await waitFor(() => expect(client.getTacticalMap.mock.calls.length).toBeGreaterThan(readsBeforePoll));
+    expect(screen.getByText("Token moved and exploration refreshed from the server.")).toBeTruthy();
+    expect(screen.queryByText("Server-owned movement and visibility.")).toBeNull();
+    expect(screen.queryByText("Authoritative tactical map refreshed.")).toBeNull();
+  });
+
   it("never retries an ambiguous command and recovery performs one GET only", async () => {
     const client = api({ moveTacticalMapToken: vi.fn().mockRejectedValue(new TypeError("network")) });
     render(<TacticalMapPanel {...props} api={client} />);
