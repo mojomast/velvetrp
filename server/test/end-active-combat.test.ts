@@ -90,9 +90,11 @@ describe("GM can end a fight that is still active", () => {
     });
     expect(ended.encounter).toMatchObject({ status: "completed", revision: combat.revision + 1 });
     expect(ended.encounter.campaignId).toBe(campaign.id);
-    expect(repo.endCombat("local-owner", combat.combatId, {
-      expectedRevision: combat.revision,
-      idempotencyKey: "end-early",
-    })).toEqual(ended);
+    expect(
+      repo.endCombat("local-owner", combat.combatId, {
+        expectedRevision: combat.revision,
+        idempotencyKey: "end-early",
+      }),
+    ).toEqual(ended);
   });
 });
