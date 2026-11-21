@@ -505,8 +505,7 @@ const NARRATION_META_SIGNAL =
 const NARRATION_TRAVEL_SIGNAL =
   /\b(?:travel|travels|traveled|journey|journeys|journeyed|walk|walks|walked|ride|rides|rode|march|marches|marched|return|returns|returned|leave|leaves|left|depart|departs|departed|move|moves|moved|enter|enters|entered|arrive|arrives|arrived|reach|reaches|reached|head|heads|headed|go|goes|went|path|road|route)\b/;
 const NARRATION_VITALS_SIGNAL = /\b(?:hit points?|hp|health)\b/;
-const NARRATION_VITALS_STATUS_SIGNAL =
-  /\b(?:how|what|give|show|tell|check|report|count|many|much|badly)\b/;
+const NARRATION_VITALS_STATUS_SIGNAL = /\b(?:how|what|give|show|tell|check|report|count|many|much|badly)\b/;
 export interface NarrationFallbackContext {
   currentLocation?: string | null;
   reachablePlaces?: readonly string[];
@@ -1072,7 +1071,8 @@ const restClaimPattern =
 const vitalNumberPattern =
   /\b(?:health|hit points?|hp|hit dice)\b.{0,24}?\d|\d.{0,24}?\b(?:health|hit points?|hp|hit dice)\b/;
 // Second-person hit-point status is an honest restatement of actor state, not a change of place.
-const hpStatusClaimPattern = /\b(?:you\s+are\s+at|you\s+re\s+at|you\s+have)\s+(\d+)\s+of\s+(\d+)\s+(?:hit points?|hp)\b/g;
+const hpStatusClaimPattern =
+  /\b(?:you\s+are\s+at|you\s+re\s+at|you\s+have)\s+(\d+)\s+of\s+(\d+)\s+(?:hit points?|hp)\b/g;
 const hpStatusPhrasePattern = /\b(?:you are|you'?re|you have)\s+(?:at\s+)?\d+\s+of\s+\d+\s+(?:hit points?|hp)\b/gi;
 function hpStatusMatchesActorState(text: string, actorState: ActorStateContext | null): boolean {
   const health = actorState?.health;
