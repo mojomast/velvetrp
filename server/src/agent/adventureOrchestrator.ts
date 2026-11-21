@@ -1347,6 +1347,29 @@ export function prioritizeCandidateOptions<T extends { toolName: string }>(
 /** Connectors that never distinguish one location name from another. */
 const LOCATION_CONNECTORS = new Set(["the", "of", "and", "a", "an"]);
 const WHOLE_WORD_SPLIT = /[^A-Za-z0-9]+/u;
+/** Clauses small enough that a travel gesture and a place name must share one. */
+const DESTINATION_CLAUSE_SPLIT = /\b(?:and then|then|but|and)\b|[;,.!?]/u;
+/** Speech about a place is not a gesture toward it. */
+const TOPIC_SPEECH_WORDS =
+  /\b(?:ask|asks|asked|asking|tell|tells|told|telling|talk|talks|talked|talking|speak|speaks|spoke|speaking|say|says|said|saying|notice|notices|noticed|noticing|mention|mentions|mentioned|mentioning|wonder|wonders|wondered|wondering|discuss|discusses|discussed|discussing|hear|hears|heard|hearing|remember|remembers|remembered|remembering|recall|recalls|recalled|recalling|memory|memories)\b/u;
+/** A brisk movement verb that stages a destination without being a general travel word. */
+const SPRINT_WORDS = /\b(?:sprint|sprints|sprinted|sprinting|run|runs|ran|running|dash|dashes|dashed|dashing)\b/u;
+/** Locatives place a non-travel action at a named place ("search the crates at Black Berth"). */
+const LOCATIVE_WORDS =
+  /\b(?:at|in|on|near|beside|inside|outside|within|around|across|along|through|under|over|by|toward|towards)\b/u;
+/** Verbs that make the following place a source rather than a destination. */
+const LOCATION_SOURCE_PREFIXES = [
+  "from",
+  "leave",
+  "leaves",
+  "left",
+  "leaving",
+  "depart",
+  "departs",
+  "departed",
+  "departing",
+  "out of",
+];
 
 /** True only for the same word or its plural: "dock" matches "Docks", arbitrary stems do not. */
 function locationWordMatches(left: string, right: string): boolean {
@@ -1376,10 +1399,10 @@ function containsWholePhrase(words: readonly string[], phrase: readonly string[]
   return false;
 }
 /**
- * Whole-phrase or significant-word mention of one location name. A single-word place such as
- * "Docks" matches on its plural stem ("dock"), but a multi-word place needs every significant word
- * present, so a person or object sharing one word — "Keeper Maren" versus the destination
- * "Keeper House" — never counts as naming the place. A single-word name beginning with "The"
+ * Whole-phrase or significant-word mention of one location name. A multi-word place such as
+ * "Slake-Head" or "Cold Kiln" matches only as the whole phrase, so a verb plus a surname or an
+ * adjective plus an unrelated noun never completes its words by accident. A single-word place such
+ * as "Docks" still matches on its plural stem ("dock"). A single-word name beginning with "The"
  * ("The Steps", "The Throttle") additionally needs "the <word>" or the word capitalized in the
  * declaration, so an ordinary lowercase verb never names the place.
  */
@@ -1391,7 +1414,7 @@ function mentionsLocation(declaration: string, name: string): boolean {
   const words = [...new Set(locationSignificantWords(name))];
   if (words.length === 0) return false;
   const mentionsWord = (word: string) => intentWords.some((candidate) => locationWordMatches(candidate, word));
-  if (words.length >= 2) return words.every(mentionsWord);
+  if (words.length >= 2) return false;
   const word = words[0]!;
   if (!mentionsWord(word)) return false;
   if (!value.startsWith("the ")) return true;
@@ -1403,6 +1426,39 @@ function mentionsLocation(declaration: string, name: string): boolean {
   return declaration
     .split(WHOLE_WORD_SPLIT)
     .some((token) => /^[A-Z]/.test(token) && locationWordMatches(token.toLocaleLowerCase("en-US"), word));
+}
+
+function multiWordLocation(name: string): boolean {
+  return locationSignificantWords(name).length >= 2;
+}
+
+/**
+ * True when one clause both names the place and stages a movement toward it. Naming the place as a
+ * source ("I leave Slake-Head"), a topic ("ask about Slake-Head"), or a memory is not a staged
+ * destination; a genuine travel gesture in the same clause is.
+ */
+function clauseStagesDestination(clause: string, name: string): boolean {
+  if (!mentionsLocation(clause, name)) return false;
+  const text = normalized(clause);
+  const value = normalized(name);
+  let scrubbed = text;
+  for (const prefix of LOCATION_SOURCE_PREFIXES) {
+    scrubbed = scrubbed.split(`${prefix} ${value}`).join(" ");
+    scrubbed = scrubbed.split(`${prefix} the ${value}`).join(" ");
+  }
+  if (!containsWholePhrase(scrubbed.split(" ").filter(Boolean), value.split(" ").filter(Boolean))) return false;
+  if (TOPIC_SPEECH_WORDS.test(text)) return false;
+  return TRAVEL_WORDS.test(text) || TRAVEL_PHRASES.test(text) || SPRINT_WORDS.test(text) || LOCATIVE_WORDS.test(text);
+}
+
+/**
+ * A multi-word place is a staged destination only when a clause moves toward it. One-word locatives
+ * keep their existing mention logic so "I search the crates along the dock" still names Docks.
+ */
+function namesStagedDestination(declaration: string, name: string): boolean {
+  if (!mentionsLocation(declaration, name)) return false;
+  if (!multiWordLocation(name)) return true;
+  return declaration.split(DESTINATION_CLAUSE_SPLIT).some((clause) => clauseStagesDestination(clause, name));
 }
 
 /**
@@ -1442,7 +1498,8 @@ export function declarationLocationReference(
     ...new Set(
       destinationNames.filter(
         (name) =>
-          mentionsLocation(declaration, name) && (!currentLocation || normalized(name) !== normalized(currentLocation)),
+          namesStagedDestination(declaration, name) &&
+          (!currentLocation || normalized(name) !== normalized(currentLocation)),
       ),
     ),
   ];
@@ -1576,6 +1633,26 @@ export function selectHeldCommerceCandidate<T extends { action: string; vendorLa
   return matches.length === 1 ? matches[0]! : null;
 }
 
+/** Explicit trade verbs that can name an item and counterparty even without an advertised row. */
+const EXPLICIT_TRADE_WORDS =
+  /\b(?:buy|buys|buying|bought|purchase|purchases|purchasing|purchased|sell|sells|selling|sold|give|gives|giving|gave|given)\b/u;
+/** A counterparty phrase that makes an explicit trade a transaction rather than dialogue. */
+const TRADE_COUNTERPARTY = /\b(?:from|to|with)\b/u;
+
+/**
+ * True when a compound step actually stages a transaction. Spoken payment ("pay you", "name your
+ * price") or hypothetical barter in dialogue is conversation, not a pending purchase or sale.
+ */
+function stepStagesTrade(
+  step: DeclarationIntentStep,
+  candidates: HeldDeclarationContext["commerceCandidates"],
+): boolean {
+  if (!step.commerce && !step.give) return false;
+  if (selectHeldCommerceCandidate(step.text, candidates)) return true;
+  const text = step.text.toLocaleLowerCase("en-US");
+  return EXPLICIT_TRADE_WORDS.test(text) && TRADE_COUNTERPARTY.test(text);
+}
+
 /** Only a travel row for the named destination is a relevant suggestion. */
 function suggestedTravelCandidate(
   travelCandidates: HeldDeclarationContext["travelCandidates"],
@@ -1617,20 +1694,33 @@ export function describeHeldDeclaration(context: HeldDeclarationContext): Advent
     );
   const compoundPending =
     intent.steps.length >= 2
-      ? intent.steps.slice(1).find((step) => step.commerce || step.rest || step.check || step.combat || step.quest)
+      ? intent.steps
+          .slice(1)
+          .find(
+            (step) =>
+              stepStagesTrade(step, context.commerceCandidates) ||
+              step.rest ||
+              step.check ||
+              step.combat ||
+              step.quest,
+          )
       : undefined;
+  const compoundPendingTrade = compoundPending ? stepStagesTrade(compoundPending, context.commerceCandidates) : false;
   if (reference.mismatchedDestination) {
     const travel = suggestedTravelCandidate(context.travelCandidates, reference.mismatchedDestination);
     const pending = compoundPending
-      ? ` ${compoundPending.commerce ? "A purchase or sale" : compoundPending.rest ? "A rest" : compoundPending.check ? "A check" : compoundPending.combat ? "An attack" : "A later step"} still waits after the move.`
+      ? ` ${compoundPendingTrade ? "A purchase or sale" : compoundPending.rest ? "A rest" : compoundPending.check ? "A check" : compoundPending.combat ? "An attack" : "A later step"} still waits after the move.`
       : "";
+    const noRoad = travel ? "" : ` No road from here runs to ${reference.mismatchedDestination}.`;
     return {
       reason: "location-mismatch",
       suggestedCandidateId: travel?.candidateId ?? null,
-      message: `You are still at ${context.currentLocation ?? "your last known place"}, not ${reference.mismatchedDestination}.${pending}`,
+      message: `You are still at ${context.currentLocation ?? "your last known place"}, not ${reference.mismatchedDestination}.${noRoad}${pending}`,
       suggestedNextStep: travel
         ? `Travel to ${reference.mismatchedDestination}`
-        : `Move to ${reference.mismatchedDestination} first`,
+        : reachablePlaces.length > 0
+          ? `Take the road to ${reachablePlaces[0]} instead`
+          : null,
       reachablePlaces,
     };
   }
@@ -1654,7 +1744,7 @@ export function describeHeldDeclaration(context: HeldDeclarationContext): Advent
     };
   }
   if (compoundPending) {
-    const pending = compoundPending.commerce
+    const pending = compoundPendingTrade
       ? "the purchase or sale"
       : compoundPending.rest
         ? "the rest"
