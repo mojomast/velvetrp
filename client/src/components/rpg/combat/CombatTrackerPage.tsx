@@ -21,6 +21,9 @@ import type {
   CombatRewardGrantPublic,
   EconomyHttpWalletGetResponse,
   CombatEndCommandResponse,
+  CombatHandoffCommandRequest,
+  CombatSkipTurnCommandRequest,
+  CombatTurnClockResponse,
   CombatLegalAction,
   CombatLogEntryPublic,
   CombatLogResponse,
@@ -100,6 +103,22 @@ export interface CombatTrackerApi extends Partial<TacticalMapPanelApi> {
     combatId: string,
     input: { expectedRevision: number; idempotencyKey: string },
   ) => Promise<CombatEndCommandResponse>;
+  getTurnClock?: (combatId: string) => Promise<CombatTurnClockResponse>;
+  skipCurrentTurn?: (combatId: string, command: CombatSkipTurnCommandRequest) => Promise<unknown>;
+  takeOverActor?: (
+    combatId: string,
+    command: Omit<CombatHandoffCommandRequest, "action">,
+  ) => Promise<{
+    playedByGmUntilReturn?: CombatTurnClockResponse["playedByGmUntilReturn"];
+    revision?: number;
+  }>;
+  reclaimActor?: (
+    combatId: string,
+    command: Omit<CombatHandoffCommandRequest, "action">,
+  ) => Promise<{
+    playedByGmUntilReturn?: CombatTurnClockResponse["playedByGmUntilReturn"];
+    revision?: number;
+  }>;
   getSetupCandidates?: (campaignId: string) => Promise<EncounterSetupCandidatesResponse>;
   createEncounter?: (campaignId: string, input: EncounterCreateRequest) => Promise<EncounterPublic>;
 }

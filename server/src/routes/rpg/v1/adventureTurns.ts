@@ -23,6 +23,7 @@ import {
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { readRpgFeatureFlags } from "../../../features.js";
 import { sendApiProblem } from "../../../http/problem.js";
+import { getRequestPrincipal } from "../../../http/requestPrincipal.js";
 import {
   AdventureTurnAuthorizationError,
   AdventureTurnConflictError,
@@ -59,7 +60,6 @@ import type {
   ProviderCompletionResult,
 } from "../../../provider/index.js";
 
-const OWNER = "local-owner";
 const JSON_TYPE = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i;
 type Repo = Pick<
   AdventureTurnRepository,
@@ -335,10 +335,14 @@ const NARRATION_TOOL_PARAMETERS: CompletionFunctionTool["parameters"] = {
   required: ["narration"],
   additionalProperties: false,
 };
-function narrationReceipts(repo: Repo & Repository, turn: PrivateAdventureTurn): NarrationReceipt[] | null {
+function narrationReceipts(
+  repo: Repo & Repository,
+  principalId: string,
+  turn: PrivateAdventureTurn,
+): NarrationReceipt[] | null {
   const values: NarrationReceipt[] = [];
   for (const link of turn.receiptLinks) {
-    const mechanic = repo.getCommandReceipt(OWNER, turn.campaignId, link.commandId);
+    const mechanic = repo.getCommandReceipt(principalId, turn.campaignId, link.commandId);
     if (mechanic) {
       const [event] = mechanic.events;
       if (!event || mechanic.campaignId !== turn.campaignId || mechanic.commandId !== link.commandId) return null;
@@ -356,12 +360,12 @@ function narrationReceipts(repo: Repo & Repository, turn: PrivateAdventureTurn):
       values.push({ kind: "mechanic", event: { type: event.type, data } });
       continue;
     }
-    const travel = repo.getExactCandidateTravelNarrationReceipt(OWNER, turn.turnId, link.commandId);
+    const travel = repo.getExactCandidateTravelNarrationReceipt(principalId, turn.turnId, link.commandId);
     if (travel) {
       values.push({ kind: "travel", destination: travel.destination });
       continue;
     }
-    const journey = repo.getActorJourneyNarrationReceipt(OWNER, turn.turnId, link.commandId);
+    const journey = repo.getActorJourneyNarrationReceipt(principalId, turn.turnId, link.commandId);
     if (journey) {
       values.push({
         kind: "journey",
@@ -374,7 +378,7 @@ function narrationReceipts(repo: Repo & Repository, turn: PrivateAdventureTurn):
       });
       continue;
     }
-    const inventory = repo.getAdventureInventoryNarrationReceipt(OWNER, turn.turnId, link.commandId);
+    const inventory = repo.getAdventureInventoryNarrationReceipt(principalId, turn.turnId, link.commandId);
     if (inventory) {
       values.push({
         kind: "inventory",
@@ -386,7 +390,7 @@ function narrationReceipts(repo: Repo & Repository, turn: PrivateAdventureTurn):
       });
       continue;
     }
-    const commerce = repo.getAdventureCommerceNarrationReceipt(OWNER, turn.turnId, link.commandId);
+    const commerce = repo.getAdventureCommerceNarrationReceipt(principalId, turn.turnId, link.commandId);
     if (commerce) {
       values.push({
         kind: "commerce",
@@ -402,27 +406,31 @@ function narrationReceipts(repo: Repo & Repository, turn: PrivateAdventureTurn):
       });
       continue;
     }
-    const questProgression = repo.getAdventureQuestProgressionNarrationReceipt(OWNER, turn.turnId, link.commandId);
+    const questProgression = repo.getAdventureQuestProgressionNarrationReceipt(
+      principalId,
+      turn.turnId,
+      link.commandId,
+    );
     if (questProgression) {
       values.push(questProgression);
       continue;
     }
-    const quest = repo.getAdventureQuestNarrationReceipt(OWNER, turn.turnId, link.commandId);
+    const quest = repo.getAdventureQuestNarrationReceipt(principalId, turn.turnId, link.commandId);
     if (quest) {
       values.push({ kind: "quest", ...quest });
       continue;
     }
-    const check = repo.getAdventureCheckNarrationReceipt(OWNER, turn.turnId, link.commandId);
+    const check = repo.getAdventureCheckNarrationReceipt(principalId, turn.turnId, link.commandId);
     if (check) {
       values.push({ kind: "check", ...check });
       continue;
     }
-    const action = repo.getAdventurePowerRestNarrationReceipt(OWNER, turn.turnId, link.commandId);
+    const action = repo.getAdventurePowerRestNarrationReceipt(principalId, turn.turnId, link.commandId);
     if (action) {
       values.push(action);
       continue;
     }
-    const combat = repo.getAgentCombatReceipt(OWNER, turn.campaignId, link.commandId);
+    const combat = repo.getAgentCombatReceipt(principalId, turn.campaignId, link.commandId);
     const resolution = combatActionResolutionSchema.safeParse(combat?.resolution);
     if (!combat || !resolution.success) return null;
     const outcome = resolution.data.outcomes[0];
@@ -1605,9 +1613,9 @@ export function narrationDebugFields(input: {
  * Reuses the travel candidate generator's exact, transactionally bounded read; any refusal or
  * malformed batch degrades to no suggestion so narration never invents a road.
  */
-function narrationReachablePlaces(repo: Repo & Repository, turn: PrivateAdventureTurn): string[] {
+function narrationReachablePlaces(repo: Repo & Repository, principalId: string, turn: PrivateAdventureTurn): string[] {
   try {
-    const batch = repo.generateActorTravelCandidates(OWNER, {
+    const batch = repo.generateActorTravelCandidates(principalId, {
       turnId: turn.turnId,
       idempotencyKey: `provider-player:${createHash("sha256").update(turn.turnId).digest("hex").slice(0, 48)}`,
       audienceMode: "player",
@@ -1630,14 +1638,15 @@ function narrationReachablePlaces(repo: Repo & Repository, turn: PrivateAdventur
 }
 async function performNarration(
   repo: Repo & Repository,
+  principalId: string,
   turn: PrivateAdventureTurn,
   dependencies: AdventureAgentDependencies | undefined,
   signal: AbortSignal,
   hold?: AdventureHold,
   providerDisconnected = false,
 ): Promise<NarrationResult> {
-  const safeReceipts = narrationReceipts(repo, turn);
-  const reachablePlaces = narrationReachablePlaces(repo, turn);
+  const safeReceipts = narrationReceipts(repo, principalId, turn);
+  const reachablePlaces = narrationReachablePlaces(repo, principalId, turn);
   // A deliberate mechanical hold is the turn's own deterministic narration. It is computed from
   // the orchestrator's bounded reason, never from provider output. Social/routine declarations
   // instead continue to bounded conversation narration. A held declaration does not resolve its own mechanics, so any receipt
@@ -1645,7 +1654,9 @@ async function performNarration(
   // receipt) and must not overwrite the declaration with an unrelated line. A pure conversation,
   // question, or meta hold is not a concrete action and keeps the provider-backed path unchanged.
   const presentNpcNames =
-    safeReceipts?.length === 0 ? repo.getAdventureNarrationPresentNpcs(OWNER, turn.turnId).map((npc) => npc.name) : [];
+    safeReceipts?.length === 0
+      ? repo.getAdventureNarrationPresentNpcs(principalId, turn.turnId).map((npc) => npc.name)
+      : [];
   const holdWarranted = Boolean(hold && holdNarrationIsWarranted(hold, turn.declaration, presentNpcNames));
   const recordFallback = (text: string, outcome: NarrationOutcome): NarrationResult => {
     recordNarrationDebug(turn.turnId, {
@@ -1674,9 +1685,9 @@ async function performNarration(
   let fallbackText = narrationFallback(turn.declaration, safeReceipts ?? [], { reachablePlaces });
   if (!safeReceipts) return recordFallback(fallbackText, "provider-error");
   const callId = key("narration-provider", turn.turnId);
-  const recovered = repo.getNarrationProviderDispatch(OWNER, turn.turnId, callId);
+  const recovered = repo.getNarrationProviderDispatch(principalId, turn.turnId, callId);
   if (recovered?.state === "settled") {
-    const settled = finalizeNarrationDispatch(repo, turn.turnId, callId, recovered);
+    const settled = finalizeNarrationDispatch(repo, principalId, turn.turnId, callId, recovered);
     recordNarrationDebug(settled.turn.turnId, {
       holdReason: null,
       gateRule: null,
@@ -1689,7 +1700,7 @@ async function performNarration(
   // durable narration with the deterministic fallback instead of starting an undeliverable provider
   // call. A provider call already in flight for this turn is still awaited exactly as before.
   if (providerDisconnected && !recovered) {
-    const publicContext = publicNarrationContext(repo, turn);
+    const publicContext = publicNarrationContext(repo, principalId, turn);
     return recordFallback(
       narrationFallback(turn.declaration, safeReceipts, {
         currentLocation: publicContext?.currentLocation ?? null,
@@ -1711,7 +1722,7 @@ async function performNarration(
   let history;
   try {
     history = repo.getAdventureTurnTranscript(
-      OWNER,
+      principalId,
       turn.campaignId,
       turn.sessionId,
       harness.recentTurns,
@@ -1720,11 +1731,11 @@ async function performNarration(
   } catch {
     return recordFallback(fallbackText, "provider-error");
   }
-  const publicContext = publicNarrationContext(repo, turn);
+  const publicContext = publicNarrationContext(repo, principalId, turn);
   if (!publicContext) return recordFallback(fallbackText, "provider-error");
   const actorState = buildActorStateContext({
     repo,
-    principal: OWNER,
+    principal: principalId,
     campaignId: turn.campaignId,
     sessionId: turn.sessionId,
     actorId: turn.actorId,
@@ -1738,7 +1749,7 @@ async function performNarration(
   // Derivatives retain the settled-original guard; receipts and proposals never enter this lane.
   const priorProjection =
     safeReceipts.length === 0 && turn.mode !== "original" && turn.priorTurnId
-      ? repo.getAdventureTurn(OWNER, turn.priorTurnId)
+      ? repo.getAdventureTurn(principalId, turn.priorTurnId)
       : null;
   const originalConversation =
     turn.mode === "original" &&
@@ -1784,7 +1795,7 @@ async function performNarration(
           harness,
           history,
           rulesetDescriptor: publicContext.ruleset.descriptor,
-          safetyPolicy: repo.getSessionZeroSafetyPolicy(OWNER, turn.campaignId),
+          safetyPolicy: repo.getSessionZeroSafetyPolicy(principalId, turn.campaignId),
         })
       : adventureNarrationMessages({
           declaration: turn.declaration,
@@ -1797,12 +1808,12 @@ async function performNarration(
           harness,
           history,
           rulesetDescriptor: publicContext.ruleset.descriptor,
-          safetyPolicy: repo.getSessionZeroSafetyPolicy(OWNER, turn.campaignId),
+          safetyPolicy: repo.getSessionZeroSafetyPolicy(principalId, turn.campaignId),
         }),
   };
   const providerName = provider.providerType || "openai-compatible",
     model = provider.model.trim() || "unconfigured";
-  let claim = repo.claimNarrationProviderDispatch(OWNER, {
+  let claim = repo.claimNarrationProviderDispatch(principalId, {
     turnId: turn.turnId,
     callId,
     provider: providerName,
@@ -1820,8 +1831,8 @@ async function performNarration(
     if (signal.aborted) throw new Error("narration aborted");
     await new Promise<void>((resolve) => setTimeout(resolve, 10));
     claim =
-      repo.getNarrationProviderDispatch(OWNER, turn.turnId, callId) ??
-      repo.claimNarrationProviderDispatch(OWNER, {
+      repo.getNarrationProviderDispatch(principalId, turn.turnId, callId) ??
+      repo.claimNarrationProviderDispatch(principalId, {
         turnId: turn.turnId,
         callId,
         provider: providerName,
@@ -1831,7 +1842,7 @@ async function performNarration(
       });
   }
   if (claim.state === "settled") {
-    const settled = finalizeNarrationDispatch(repo, turn.turnId, callId, claim);
+    const settled = finalizeNarrationDispatch(repo, principalId, turn.turnId, callId, claim);
     recordNarrationDebug(settled.turn.turnId, {
       holdReason: null,
       gateRule: null,
@@ -1842,7 +1853,7 @@ async function performNarration(
   }
   const claimId = claim.claimId;
   try {
-    turn = repo.recordProviderCallStart(OWNER, {
+    turn = repo.recordProviderCallStart(principalId, {
       turnId: turn.turnId,
       callId,
       provider: providerName,
@@ -1853,7 +1864,7 @@ async function performNarration(
       idempotencyKey: key("narration-provider-start", turn.turnId),
     });
   } catch {
-    claim = repo.settleNarrationProviderDispatch(OWNER, {
+    claim = repo.settleNarrationProviderDispatch(principalId, {
       turnId: turn.turnId,
       callId,
       claimId,
@@ -1864,7 +1875,7 @@ async function performNarration(
       completionTokens: null,
     });
     if (claim.state !== "settled")
-      claim = repo.claimNarrationProviderDispatch(OWNER, {
+      claim = repo.claimNarrationProviderDispatch(principalId, {
         turnId: turn.turnId,
         callId,
         provider: providerName,
@@ -1873,7 +1884,7 @@ async function performNarration(
         leaseMs: 90_000,
       });
     if (claim.state === "settled") {
-      const settled = finalizeNarrationDispatch(repo, turn.turnId, callId, claim);
+      const settled = finalizeNarrationDispatch(repo, principalId, turn.turnId, callId, claim);
       recordNarrationDebug(settled.turn.turnId, {
         holdReason: null,
         gateRule: null,
@@ -1900,7 +1911,7 @@ async function performNarration(
     : null;
   if (!budget?.allowed) {
     const reason = budget ? budget.reason : "pricing-unconfigured";
-    claim = repo.settleNarrationProviderDispatch(OWNER, {
+    claim = repo.settleNarrationProviderDispatch(principalId, {
       turnId: turn.turnId,
       callId,
       claimId,
@@ -1911,7 +1922,7 @@ async function performNarration(
       completionTokens: null,
     });
     if (claim.state === "settled") {
-      const settled = finalizeNarrationDispatch(repo, turn.turnId, callId, claim);
+      const settled = finalizeNarrationDispatch(repo, principalId, turn.turnId, callId, claim);
       recordNarrationDebug(settled.turn.turnId, {
         holdReason: null,
         gateRule: null,
@@ -1988,11 +1999,11 @@ async function performNarration(
     } else {
       debugOutcome = "provider-accepted";
     }
-    const currentSnapshot = repo.getCampaignAgentContextSnapshot(OWNER, turn.campaignId, turn.sessionId, {
+    const currentSnapshot = repo.getCampaignAgentContextSnapshot(principalId, turn.campaignId, turn.sessionId, {
       kind: "player",
       actorId: turn.actorId,
     });
-    if (JSON.stringify(publicNarrationContext(repo, turn)) !== JSON.stringify(publicContext))
+    if (JSON.stringify(publicNarrationContext(repo, principalId, turn)) !== JSON.stringify(publicContext))
       throw new Error("narration public context is stale");
     if (
       !currentSnapshot?.ruleset ||
@@ -2009,7 +2020,7 @@ async function performNarration(
     budgetSettled = true;
     measuredUsage = charged;
     usageEstimated = charged.source === "estimated";
-    claim = repo.settleNarrationProviderDispatch(OWNER, {
+    claim = repo.settleNarrationProviderDispatch(principalId, {
       turnId: turn.turnId,
       callId,
       claimId,
@@ -2043,7 +2054,7 @@ async function performNarration(
       measuredUsage = charged;
       usageEstimated = charged.source === "estimated";
     }
-    claim = repo.settleNarrationProviderDispatch(OWNER, {
+    claim = repo.settleNarrationProviderDispatch(principalId, {
       turnId: turn.turnId,
       callId,
       claimId,
@@ -2068,7 +2079,7 @@ async function performNarration(
     repairAttempted,
   });
   if (claim.state !== "settled")
-    claim = repo.claimNarrationProviderDispatch(OWNER, {
+    claim = repo.claimNarrationProviderDispatch(principalId, {
       turnId: turn.turnId,
       callId,
       provider: providerName,
@@ -2077,37 +2088,38 @@ async function performNarration(
       leaseMs: 90_000,
     });
   return claim.state === "settled"
-    ? finalizeNarrationDispatch(repo, turn.turnId, callId, claim)
+    ? finalizeNarrationDispatch(repo, principalId, turn.turnId, callId, claim)
     : {
-        turn: requirePrivate(repo.getAdventureTurn(OWNER, turn.turnId)),
+        turn: requirePrivate(repo.getAdventureTurn(principalId, turn.turnId)),
         text: fallbackText,
         source: "deterministic-fallback",
       };
 }
 function finalizeNarrationDispatch(
   repo: Repo & Repository,
+  principalId: string,
   turnId: string,
   callId: string,
   dispatch: Extract<ReturnType<Repo["getNarrationProviderDispatch"]>, { state: "settled" }>,
 ): NarrationResult {
-  const currentTurn = requirePrivate(repo.getAdventureTurn(OWNER, turnId));
-  const frozen = repo.getNarrationProviderContext(OWNER, turnId, callId);
-  const publicContext = publicNarrationContext(repo, currentTurn);
+  const currentTurn = requirePrivate(repo.getAdventureTurn(principalId, turnId));
+  const frozen = repo.getNarrationProviderContext(principalId, turnId, callId);
+  const publicContext = publicNarrationContext(repo, principalId, currentTurn);
   if (frozen && JSON.stringify(frozen) !== JSON.stringify(publicContext)) {
     return {
       turn: currentTurn,
-      text: narrationFallback(currentTurn.declaration, narrationReceipts(repo, currentTurn) ?? [], {
+      text: narrationFallback(currentTurn.declaration, narrationReceipts(repo, principalId, currentTurn) ?? [], {
         currentLocation: publicContext?.currentLocation ?? null,
-        reachablePlaces: narrationReachablePlaces(repo, currentTurn),
+        reachablePlaces: narrationReachablePlaces(repo, principalId, currentTurn),
       }),
       source: "deterministic-fallback",
     };
   }
-  let turn = requirePrivate(repo.getAdventureTurn(OWNER, turnId));
+  let turn = requirePrivate(repo.getAdventureTurn(principalId, turnId));
   const started = turn.providerCalls.find((call) => call.callId === callId && call.phase === "started");
   if (started && !turn.providerCalls.some((call) => call.callId === callId && call.phase !== "started"))
     try {
-      turn = repo.recordProviderCallOutcome(OWNER, {
+      turn = repo.recordProviderCallOutcome(principalId, {
         turnId,
         callId,
         provider: dispatch.provider,
@@ -2122,18 +2134,18 @@ function finalizeNarrationDispatch(
         idempotencyKey: key("narration-provider-settled", turnId),
       });
     } catch {
-      turn = requirePrivate(repo.getAdventureTurn(OWNER, turnId));
+      turn = requirePrivate(repo.getAdventureTurn(principalId, turnId));
     }
   return { turn, text: dispatch.narration, source: dispatch.source };
 }
-function publicNarrationContext(repo: Repo & Repository, turn: PrivateAdventureTurn) {
-  const snapshot = repo.getCampaignAgentContextSnapshot(OWNER, turn.campaignId, turn.sessionId, {
+function publicNarrationContext(repo: Repo & Repository, principalId: string, turn: PrivateAdventureTurn) {
+  const snapshot = repo.getCampaignAgentContextSnapshot(principalId, turn.campaignId, turn.sessionId, {
     kind: "player",
     actorId: turn.actorId,
   });
   if (!snapshot?.ruleset) return null;
   const currentActorName = snapshot.speakerPersona?.displayName ?? null;
-  const historicalRecall = repo.getCampaignRecall(OWNER, {
+  const historicalRecall = repo.getCampaignRecall(principalId, {
     campaignId: turn.campaignId,
     sessionId: turn.sessionId,
     audience: { kind: "player", actorId: turn.actorId },
@@ -2147,12 +2159,12 @@ function publicNarrationContext(repo: Repo & Repository, turn: PrivateAdventureT
         (entry) => entry !== `${currentActorName}.` && !entry.startsWith(`${currentActorName} at `),
       )
     : snapshot.visibleCast;
-  const presentNpcs = repo.getAdventureNarrationPresentNpcs(OWNER, turn.turnId);
+  const presentNpcs = repo.getAdventureNarrationPresentNpcs(principalId, turn.turnId);
   const npcKnowledge = presentNpcs
     .map(({ npcId, name }) => ({
       name,
       entries: repo
-        .listAgentKnowledge(OWNER, {
+        .listAgentKnowledge(principalId, {
           campaignId: turn.campaignId,
           agentKind: "npc",
           agentId: npcId,
@@ -2181,18 +2193,19 @@ function publicNarrationContext(repo: Repo & Repository, turn: PrivateAdventureT
       presentNpcNames: presentNpcs.map((npc) => npc.name),
       npcKnowledge,
     },
-    safety: repo.getSessionZeroSafetyPolicy(OWNER, turn.campaignId),
+    safety: repo.getSessionZeroSafetyPolicy(principalId, turn.campaignId),
   };
 }
 async function narrate(
   repo: Repo & Repository,
+  principalId: string,
   turn: PrivateAdventureTurn,
   dependencies: AdventureAgentDependencies | undefined,
   signal: AbortSignal,
   hold?: AdventureHold,
   providerDisconnected = false,
 ): Promise<NarrationResult> {
-  return performNarration(repo, turn, dependencies, signal, hold, providerDisconnected);
+  return performNarration(repo, principalId, turn, dependencies, signal, hold, providerDisconnected);
 }
 
 function projectTurn(turn: PrivateAdventureTurn) {
@@ -2264,13 +2277,13 @@ function requirePrivate(value: ReturnType<Repo["getAdventureTurn"]>): PrivateAdv
   if (!value || !("declaration" in value)) throw new AdventureTurnUnavailableError("turn is unavailable");
   return value;
 }
-function resumableDecisionDigest(turn: PrivateAdventureTurn): string | null {
+function resumableDecisionDigest(turn: PrivateAdventureTurn, principalId: string): string | null {
   const required = turn.toolCalls.filter(({ proposal }) => proposal.confirmation.state !== "not-required");
   if (required.length === 0 || required.some(({ proposal }) => proposal.confirmation.state !== "decided")) return null;
   const decisions = required.map(({ proposal }) => {
     if (
       proposal.confirmation.state !== "decided" ||
-      proposal.confirmation.decision.principalId !== OWNER ||
+      proposal.confirmation.decision.principalId !== principalId ||
       !proposal.confirmation.decision.idempotencyKey.startsWith("batch:")
     )
       return null;
@@ -2286,10 +2299,12 @@ function resumableDecisionDigest(turn: PrivateAdventureTurn): string | null {
   });
   if (decisions.some((decision) => decision === null)) return null;
   return createHash("sha256")
-    .update(JSON.stringify([turn.turnId, OWNER, decisions.sort((left, right) => left![0].localeCompare(right![0]))]))
+    .update(
+      JSON.stringify([turn.turnId, principalId, decisions.sort((left, right) => left![0].localeCompare(right![0]))]),
+    )
     .digest("base64url");
 }
-function resumeToken(turn: PrivateAdventureTurn): string | null {
+function resumeToken(turn: PrivateAdventureTurn, principalId: string): string | null {
   if (turn.state === "awaiting-confirmation") {
     const pending = turn.toolCalls
       .filter(({ proposal }) => proposal.confirmation.state === "pending")
@@ -2301,7 +2316,7 @@ function resumeToken(turn: PrivateAdventureTurn): string | null {
       .sort((a, b) => a[0]!.localeCompare(b[0]!));
     if (pending.length) {
       const digest = createHash("sha256")
-        .update(JSON.stringify([turn.turnId, OWNER, pending]))
+        .update(JSON.stringify([turn.turnId, principalId, pending]))
         .digest("base64url");
       return adventureTurnResumeTokenSchema.parse(`v1.${Buffer.from(turn.turnId).toString("base64url")}.${digest}`);
     }
@@ -2315,12 +2330,12 @@ function resumeToken(turn: PrivateAdventureTurn): string | null {
         .map((link) => [link.linkId, link.commandId, link.proposalId, link.sourceTurnId, link.linkedAt])
         .sort((left, right) => String(left[0]).localeCompare(String(right[0])));
       const digest = createHash("sha256")
-        .update(JSON.stringify([turn.turnId, OWNER, "receipt-recovery", evidence]))
+        .update(JSON.stringify([turn.turnId, principalId, "receipt-recovery", evidence]))
         .digest("base64url");
       return adventureTurnResumeTokenSchema.parse(`v1.${Buffer.from(turn.turnId).toString("base64url")}.${digest}`);
     }
     const digest = createHash("sha256")
-      .update(JSON.stringify([turn.turnId, OWNER, turn.createdAt, "automatic-planning"]))
+      .update(JSON.stringify([turn.turnId, principalId, turn.createdAt, "automatic-planning"]))
       .digest("base64url");
     return adventureTurnResumeTokenSchema.parse(`v1.${Buffer.from(turn.turnId).toString("base64url")}.${digest}`);
   }
@@ -2330,12 +2345,12 @@ function resumeToken(turn: PrivateAdventureTurn): string | null {
     !turn.toolCalls.some(({ proposal }) => proposal.confirmation.state === "pending")
   ) {
     const digest = createHash("sha256")
-      .update(JSON.stringify([turn.turnId, OWNER, turn.createdAt, "automatic-planning"]))
+      .update(JSON.stringify([turn.turnId, principalId, turn.createdAt, "automatic-planning"]))
       .digest("base64url");
     return adventureTurnResumeTokenSchema.parse(`v1.${Buffer.from(turn.turnId).toString("base64url")}.${digest}`);
   }
   if (!["confirmed", "mechanics-committed", "narrating", "cancelled"].includes(turn.state)) return null;
-  const decisionDigest = resumableDecisionDigest(turn);
+  const decisionDigest = resumableDecisionDigest(turn, principalId);
   if (decisionDigest)
     return adventureTurnResumeTokenSchema.parse(
       `v1.${Buffer.from(turn.turnId).toString("base64url")}.${decisionDigest}`,
@@ -2345,17 +2360,17 @@ function resumeToken(turn: PrivateAdventureTurn): string | null {
       .map((link) => [link.linkId, link.commandId, link.proposalId, link.sourceTurnId, link.linkedAt])
       .sort((left, right) => String(left[0]).localeCompare(String(right[0])));
     const digest = createHash("sha256")
-      .update(JSON.stringify([turn.turnId, OWNER, "receipt-recovery", evidence]))
+      .update(JSON.stringify([turn.turnId, principalId, "receipt-recovery", evidence]))
       .digest("base64url");
     return adventureTurnResumeTokenSchema.parse(`v1.${Buffer.from(turn.turnId).toString("base64url")}.${digest}`);
   }
   return null;
 }
-function reconcile(repo: Repo, turn: PrivateAdventureTurn) {
-  const token = resumeToken(turn);
-  const narration = repo.getAdventureTurnNarration(OWNER, turn.turnId);
+function reconcile(repo: Repo, principalId: string, turn: PrivateAdventureTurn) {
+  const token = resumeToken(turn, principalId);
+  const narration = repo.getAdventureTurnNarration(principalId, turn.turnId);
   const callId = key("narration-provider", turn.turnId);
-  const source = repo.getAdventureTurnNarrationSource(OWNER, turn.turnId);
+  const source = repo.getAdventureTurnNarrationSource(principalId, turn.turnId);
   const debug = narrationDebugByTurn.get(turn.turnId);
   return adventureTurnGetResponseSchema.parse({
     turn: projectTurn(turn),
@@ -2386,19 +2401,19 @@ function decodeResumeToken(token: string): { turnId: string; digest: string } {
   if (!resourceIdSchema.safeParse(turnId).success || !digest) throw new AdventureTurnUnavailableError();
   return { turnId, digest };
 }
-function turnFromToken(repo: Repo, token: string): PrivateAdventureTurn {
+function turnFromToken(repo: Repo, principalId: string, token: string): PrivateAdventureTurn {
   const { turnId } = decodeResumeToken(token);
-  const turn = requirePrivate(repo.getAdventureTurn(OWNER, turnId));
-  if (resumeToken(turn) !== token) {
+  const turn = requirePrivate(repo.getAdventureTurn(principalId, turnId));
+  if (resumeToken(turn, principalId) !== token) {
     throw new AdventureTurnUnavailableError("resume token is unavailable");
   }
   return turn;
 }
 
-function expireDue(repo: Repo, turn: PrivateAdventureTurn): PrivateAdventureTurn {
+function expireDue(repo: Repo, principalId: string, turn: PrivateAdventureTurn): PrivateAdventureTurn {
   if (!turn.toolCalls.some(({ proposal }) => proposal.confirmation.state === "pending")) return turn;
   try {
-    return repo.expireToolProposals(OWNER, {
+    return repo.expireToolProposals(principalId, {
       turnId: turn.turnId,
       expectedTurnRevision: turn.revision,
       expectedCampaignRevision: turn.campaignRevision,
@@ -2447,6 +2462,7 @@ async function stream(
   request: FastifyRequest,
   reply: Parameters<typeof sendApiProblem>[1],
   repo: Repo,
+  principalId: string,
   initial: PrivateAdventureTurn,
   streamKind: "initial" | "resume" | "variant",
   agentDependencies?: AdventureAgentDependencies,
@@ -2474,7 +2490,7 @@ async function stream(
   const finish = (turn: PrivateAdventureTurn, outcome: "done" | "aborted" | "error") => {
     if (terminal || closed) return;
     terminal = true;
-    const view = reconcile(repo, turn);
+    const view = reconcile(repo, principalId, turn);
     send({
       type: "terminal",
       payload: { outcome, turn: view.turn, narrationStatus: view.narrationStatus, receipts: view.receipts },
@@ -2485,7 +2501,7 @@ async function stream(
   // not remain "declared" forever.
   const settleStrandedTurn = (turn: PrivateAdventureTurn): PrivateAdventureTurn => {
     if (["completed", "cancelled", "failed"].includes(turn.state) || turn.receiptLinks.length > 0) return turn;
-    return repo.updateAdventureTurnNarration(OWNER, {
+    return repo.updateAdventureTurnNarration(principalId, {
       turnId: turn.turnId,
       expectedTurnRevision: turn.revision,
       expectedCampaignRevision: turn.campaignRevision,
@@ -2507,9 +2523,9 @@ async function stream(
       Number.isFinite(configuredHeartbeat) && configuredHeartbeat > 0 ? configuredHeartbeat : 15_000,
     );
     heartbeat.unref();
-    let turn = expireDue(repo, initial);
+    let turn = expireDue(repo, principalId, initial);
     if (streamKind === "resume" && turn.receiptLinks.some(({ linkId }) => linkId.startsWith("recoverable-"))) {
-      turn = repo.reconcileAdventureTurnMechanics(OWNER, {
+      turn = repo.reconcileAdventureTurnMechanics(principalId, {
         turnId: turn.turnId,
         expectedTurnRevision: turn.revision,
         expectedCampaignRevision: turn.campaignRevision,
@@ -2522,7 +2538,7 @@ async function stream(
       await yieldToEventLoop();
     }
     if (turn.state === "completed") {
-      const narration = repo.getAdventureTurnNarration(OWNER, turn.turnId);
+      const narration = repo.getAdventureTurnNarration(principalId, turn.turnId);
       if (narration) {
         send({ type: "narration_delta", payload: { text: narration } });
         await yieldToEventLoop();
@@ -2566,7 +2582,7 @@ async function stream(
       // terminal that suggests the already-dispatched request was cancelled.
       while (agent.outcome === "in-progress") {
         await new Promise<void>((resolve) => setTimeout(resolve, 10));
-        turn = requirePrivate(repo.getAdventureTurn(OWNER, turn.turnId));
+        turn = requirePrivate(repo.getAdventureTurn(principalId, turn.turnId));
         agent = await orchestrateAdventureTurn(
           repo as Repo & Repository,
           turn.turnId,
@@ -2590,7 +2606,7 @@ async function stream(
     const pending = turn.toolCalls.filter(({ proposal }) => proposal.confirmation.state === "pending");
     if (pending.length > 0) {
       if (turn.state === "proposed")
-        turn = repo.waitForToolConfirmation(OWNER, {
+        turn = repo.waitForToolConfirmation(principalId, {
           turnId: turn.turnId,
           expectedTurnRevision: turn.revision,
           expectedCampaignRevision: turn.campaignRevision,
@@ -2627,7 +2643,7 @@ async function stream(
       send({ type: "mechanics_committed", payload: { receipts: receipts(turn) } });
       await yieldToEventLoop();
     }
-    let narration = repo.getAdventureTurnNarration(OWNER, turn.turnId);
+    let narration = repo.getAdventureTurnNarration(principalId, turn.turnId);
     // True only when this request durably completed the narration; a resume or
     // a lost settlement race never re-fires the post-narration side hook.
     let narrationSettledHere = false;
@@ -2636,7 +2652,7 @@ async function stream(
       await yieldToEventLoop();
       const startedNarrationHere = turn.state !== "narrating";
       if (startedNarrationHere)
-        turn = repo.updateAdventureTurnNarration(OWNER, {
+        turn = repo.updateAdventureTurnNarration(principalId, {
           turnId: turn.turnId,
           expectedTurnRevision: turn.revision,
           expectedCampaignRevision: turn.campaignRevision,
@@ -2646,6 +2662,7 @@ async function stream(
       await yieldToEventLoop();
       const narrated = await narrate(
         repo as Repo & Repository,
+        principalId,
         turn,
         agentDependencies,
         abort.signal,
@@ -2656,7 +2673,7 @@ async function stream(
       narration = narrated.text;
       if (turn.state !== "completed")
         try {
-          turn = repo.updateAdventureTurnNarration(OWNER, {
+          turn = repo.updateAdventureTurnNarration(principalId, {
             turnId: turn.turnId,
             expectedTurnRevision: turn.revision,
             expectedCampaignRevision: turn.campaignRevision,
@@ -2669,9 +2686,9 @@ async function stream(
           narrationSettledHere = true;
         } catch (error) {
           if (!(error instanceof AdventureTurnConflictError || error instanceof AdventureTurnStaleError)) throw error;
-          turn = requirePrivate(repo.getAdventureTurn(OWNER, turn.turnId));
+          turn = requirePrivate(repo.getAdventureTurn(principalId, turn.turnId));
           if (turn.state !== "completed") throw error;
-          narration = repo.getAdventureTurnNarration(OWNER, turn.turnId) ?? narration;
+          narration = repo.getAdventureTurnNarration(principalId, turn.turnId) ?? narration;
         }
       await yieldToEventLoop();
     }
@@ -2703,7 +2720,7 @@ async function stream(
       send({ type: "choice", payload: { choices: affordances } });
       await yieldToEventLoop();
     }
-    finish(requirePrivate(repo.getAdventureTurn(OWNER, turn.turnId)), "done");
+    finish(requirePrivate(repo.getAdventureTurn(principalId, turn.turnId)), "done");
   } catch (error) {
     if (closed || abort.signal.aborted) return;
     request.log.error(
@@ -2711,7 +2728,7 @@ async function stream(
       "RPG adventure turn stream failed",
     );
     try {
-      finish(requirePrivate(repo.getAdventureTurn(OWNER, initial.turnId)), "error");
+      finish(requirePrivate(repo.getAdventureTurn(principalId, initial.turnId)), "error");
     } catch {
       /* connection or durable state is unavailable */
     }
@@ -2740,10 +2757,13 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
       const query = adventureTurnTranscriptRequestSchema.safeParse(request.query);
       if (!query.success)
         return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Adventure transcript locator is invalid");
+      const principalId = getRequestPrincipal(request);
+      if (principalId === null)
+        return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
       try {
         const turns = options
           .adventureTurnRepositoryAccessor()
-          .getAdventureTurnTranscript(OWNER, query.data.campaignId, query.data.sessionId);
+          .getAdventureTurnTranscript(principalId, query.data.campaignId, query.data.sessionId);
         return reply.send(adventureTurnTranscriptResponseSchema.parse({ ...query.data, turns }));
       } catch (error) {
         return fail(request, reply, error);
@@ -2787,18 +2807,21 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
       const body = adventureTurnStreamRequestSchema.safeParse(request.body);
       if (!body.success)
         return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Adventure turn stream request is invalid");
+      const principalId = getRequestPrincipal(request);
+      if (principalId === null)
+        return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
       try {
         const repo = options.adventureTurnRepositoryAccessor();
         let turn: PrivateAdventureTurn;
         let streamKind: "initial" | "resume" | "variant" = "initial";
         if ("resumeToken" in body.data) {
           streamKind = "resume";
-          turn = turnFromToken(repo, body.data.resumeToken);
+          turn = turnFromToken(repo, principalId, body.data.resumeToken);
         } else if ("variant" in body.data) {
           streamKind = "variant";
-          const campaign = repo.getCampaign(OWNER, body.data.campaignId);
+          const campaign = repo.getCampaign(principalId, body.data.campaignId);
           if (!campaign) throw new AdventureTurnUnavailableError();
-          const prior = requirePrivate(repo.getAdventureTurn(OWNER, body.data.priorTurnId));
+          const prior = requirePrivate(repo.getAdventureTurn(principalId, body.data.priorTurnId));
           if (
             prior.campaignId !== body.data.campaignId ||
             prior.sessionId !== body.data.sessionId ||
@@ -2806,7 +2829,7 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
             !["completed", "cancelled", "failed"].includes(prior.state)
           )
             throw new AdventureTurnConflictError("narration ancestor is out of scope");
-          turn = repo.createAdventureTurn(OWNER, {
+          turn = repo.createAdventureTurn(principalId, {
             campaignId: body.data.campaignId,
             timelineId: campaign.activeTimelineId,
             sessionId: body.data.sessionId,
@@ -2817,11 +2840,11 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
             expectedCampaignRevision: body.data.expectedRevision,
             idempotencyKey: body.data.idempotencyKey,
           });
-          turn = requirePrivate(repo.getAdventureTurn(OWNER, turn.turnId));
+          turn = requirePrivate(repo.getAdventureTurn(principalId, turn.turnId));
         } else {
-          const campaign = repo.getCampaign(OWNER, body.data.campaignId);
+          const campaign = repo.getCampaign(principalId, body.data.campaignId);
           if (!campaign) throw new AdventureTurnUnavailableError();
-          turn = repo.createAdventureTurn(OWNER, {
+          turn = repo.createAdventureTurn(principalId, {
             campaignId: body.data.campaignId,
             timelineId: campaign.activeTimelineId,
             sessionId: body.data.sessionId,
@@ -2832,7 +2855,7 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
             idempotencyKey: body.data.idempotencyKey,
           });
           // Creation receipts intentionally replay their historical result; stream the fresh durable aggregate.
-          turn = requirePrivate(repo.getAdventureTurn(OWNER, turn.turnId));
+          turn = requirePrivate(repo.getAdventureTurn(principalId, turn.turnId));
         }
         // The durable identity exists before SSE framing for both initial and
         // resume requests, allowing clients to reconcile even if the first body
@@ -2840,7 +2863,16 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
         // openSse hijacks Fastify and writes directly to the Node response, so
         // bind this route-specific header on the raw response before writeHead.
         reply.raw.setHeader("X-Adventure-Turn-Id", turn.turnId);
-        await stream(request, reply, repo, turn, streamKind, options.agentDependencies, options.onNarrationSettled);
+        await stream(
+          request,
+          reply,
+          repo,
+          principalId,
+          turn,
+          streamKind,
+          options.agentDependencies,
+          options.onNarrationSettled,
+        );
       } catch (error) {
         return fail(request, reply, error);
       }
@@ -2871,16 +2903,19 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
           "RPG_INVALID_REQUEST",
           "Initial turn reconciliation locator is invalid",
         );
+      const principalId = getRequestPrincipal(request);
+      if (principalId === null)
+        return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
       try {
         const repo = options.adventureTurnRepositoryAccessor();
         const found = repo.getAdventureTurnByInitialIdempotencyKey(
-          OWNER,
+          principalId,
           query.data.campaignId,
           query.data.sessionId,
           query.data.actorId,
           query.data.idempotencyKey,
         );
-        const result = found ? reconcile(repo, expireDue(repo, requirePrivate(found))) : null;
+        const result = found ? reconcile(repo, principalId, expireDue(repo, principalId, requirePrivate(found))) : null;
         return reply.send(adventureTurnInitialReconcileResponseSchema.parse({ result }));
       } catch (error) {
         return fail(request, reply, error);
@@ -2912,9 +2947,18 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
       const turnId = resourceIdSchema.safeParse(request.params.turnId);
       if (!turnId.success)
         return sendApiProblem(request, reply, 404, "RPG_ADVENTURE_TURN_NOT_FOUND", "Adventure turn not found");
+      const principalId = getRequestPrincipal(request);
+      if (principalId === null)
+        return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
       try {
         const repo = options.adventureTurnRepositoryAccessor();
-        return reply.send(reconcile(repo, expireDue(repo, requirePrivate(repo.getAdventureTurn(OWNER, turnId.data)))));
+        return reply.send(
+          reconcile(
+            repo,
+            principalId,
+            expireDue(repo, principalId, requirePrivate(repo.getAdventureTurn(principalId, turnId.data))),
+          ),
+        );
       } catch (error) {
         return fail(request, reply, error);
       }
@@ -2970,10 +3014,13 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
           "RPG_INVALID_REQUEST",
           "Adventure turn confirmation request is invalid",
         );
+      const principalId = getRequestPrincipal(request);
+      if (principalId === null)
+        return sendApiProblem(request, reply, 401, "RPG_AUTHENTICATION_REQUIRED", "Authentication required");
       try {
         const repo = options.adventureTurnRepositoryAccessor();
-        const before = requirePrivate(repo.getAdventureTurn(OWNER, turnId.data));
-        let turn = repo.decideToolProposals(OWNER, {
+        const before = requirePrivate(repo.getAdventureTurn(principalId, turnId.data));
+        let turn = repo.decideToolProposals(principalId, {
           turnId: turnId.data,
           proposalIds: body.data.proposalIds,
           decision: body.data.decision === "approve" ? "approved" : "rejected",
@@ -2981,7 +3028,7 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
           expectedCampaignRevision: before.campaignRevision,
           idempotencyKey: body.data.idempotencyKey,
         });
-        const planning = (repo as Repo & Repository).getDurableAgentPlanningState(OWNER, turn.turnId);
+        const planning = (repo as Repo & Repository).getDurableAgentPlanningState(principalId, turn.turnId);
         // A single approval executes the confirmed mechanics for any agent-originated turn: the
         // approval is the only human decision, and the following resume request only narrates the
         // already-committed receipt. Directly appended legacy proposals (no provider start, no
@@ -3001,7 +3048,7 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
         if (noPending && hasApproved && providerSelected)
           turn = (await orchestrateAdventureTurn(repo as Repo & Repository, turn.turnId, options.agentDependencies))
             .turn;
-        const token = resumeToken(turn);
+        const token = resumeToken(turn, principalId);
         const response = { turn: projectTurn(turn), ...(token ? { resumeToken: token } : {}) };
         return reply.send(adventureTurnConfirmResponseSchema.parse(response));
       } catch (error) {
