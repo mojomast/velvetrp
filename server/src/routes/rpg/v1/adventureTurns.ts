@@ -256,6 +256,33 @@ type NarrationResult = {
   text: string;
   source: "provider-assisted" | "deterministic-fallback";
 };
+export type NarrationHoldReason = AdventureHold["reason"];
+export type NarrationOutcome =
+  | "provider-accepted"
+  | "repair-accepted"
+  | "gate-rejected"
+  | "repair-skipped"
+  | "parse-failed"
+  | "provider-error"
+  | "hold-skipped-provider"
+  | "budget"
+  | "disconnected";
+export type NarrationDebugFields = {
+  holdReason: NarrationHoldReason | null;
+  gateRule: string | null;
+  narrationOutcome: NarrationOutcome;
+  repairAttempted: boolean;
+};
+const narrationDebugByTurn = new Map<string, NarrationDebugFields>();
+const MAX_NARRATION_DEBUG_ENTRIES = 2_000;
+function recordNarrationDebug(turnId: string, fields: NarrationDebugFields): NarrationDebugFields {
+  if (!narrationDebugByTurn.has(turnId) && narrationDebugByTurn.size >= MAX_NARRATION_DEBUG_ENTRIES) {
+    const oldest = narrationDebugByTurn.keys().next().value;
+    if (oldest !== undefined) narrationDebugByTurn.delete(oldest);
+  }
+  narrationDebugByTurn.set(turnId, fields);
+  return fields;
+}
 const NARRATION_TOOL_NAME = "submit_adventure_narration";
 /** Prompt provenance recorded for receipt-free conversation and eligible hold derivatives. */
 export const CONVERSATION_NARRATION_PROMPT_VERSION = "adventure-conversation-narration-v2";
@@ -1308,6 +1335,107 @@ export function providerNarrationMatchesReceipts(
     );
   });
 }
+/**
+ * First failed grounding rule for provider prose, or null when the existing gate would accept it.
+ * The rule ids are stable labels for the turn log; they never change the gate's accept/reject
+ * decision except for the explicit invented buy/sell wording this diagnostic already names.
+ */
+export function narrationGateFailure(
+  text: string,
+  values: readonly NarrationReceipt[],
+  currentLocation: string | null = null,
+  actorState: ActorStateContext | null = null,
+): string | null {
+  if (deniesActiveCombatEnemy(text, actorState)) return "enemy-denied";
+  if (!acknowledgesCurrentLocation(text, currentLocation)) return "current-location";
+  const normalized = normalizedNarration(text);
+  if (
+    currentLocation &&
+    /\b(?:deterministic|authoritative result|selected character|tool call|provider|prompt)\b/.test(normalized)
+  )
+    return "stale-context";
+  const hasKind = (...kinds: NarrationReceipt["kind"][]) => values.some((value) => kinds.includes(value.kind));
+  const damageClaims = [...normalized.matchAll(/\b(\d+)\s+(?:[a-z]+\s+){0,2}damage\b/g)].map((match) =>
+    Number(match[1]),
+  );
+  const healingClaims = [
+    ...normalized.matchAll(
+      /\b(?:heal(?:s|ed|ing)?(?:\s+(?:you|them|him|her))?\s+(?:for\s+)?|restore(?:s|d)?\s+)(\d+)\s+(?:hit points?|hp|health)\b/g,
+    ),
+  ].map((match) => Number(match[1]));
+  const allowedDamage = values.flatMap((value) =>
+    value.kind === "combat" && value.outcome.kind === "damage"
+      ? [value.outcome.applied]
+      : value.kind === "combat-consumable" || value.kind === "combat-power"
+        ? value.outcomes.flatMap((outcome) => (outcome.kind === "damage" ? [outcome.applied] : []))
+        : [],
+  );
+  const allowedHealing = values.flatMap((value) =>
+    value.kind === "combat-consumable" || value.kind === "combat-power"
+      ? value.outcomes.flatMap((outcome) => (outcome.kind === "healing" ? [outcome.applied] : []))
+      : [],
+  );
+  if (damageClaims.some((amount) => !allowedDamage.includes(amount))) return "unsupported-damage";
+  if (healingClaims.some((amount) => !allowedHealing.includes(amount))) return "unsupported-healing";
+  const unsupportedTravel =
+    !hasKind("travel", "journey") &&
+    text.split(/[.!?;:\n]+/).some((clause) => travelClaimPattern.test(normalizedNarration(clause)));
+  const unsupportedInventory =
+    !hasKind("inventory", "commerce", "quest-lifecycle") &&
+    /\b(?:you|they|the party|the group)\s+(?:gain|gains|gained|receive|receives|received|obtain|obtains|obtained|acquire|acquires|acquired|lose|loses|lost|drop|drops|dropped|consume|consumes|consumed|equip|equips|equipped|unequip|unequips|unequipped|buy|buys|bought|sell|sells|sold)\b.{0,80}\b(?:gold|coins?|currency|credits?|potion|weapon|armor|item|inventory|reward|sword|shield|bow|dagger|ring|amulet|scroll)\b/.test(
+      normalized,
+    );
+  const unsupportedCurrency =
+    !hasKind("commerce", "quest-lifecycle") &&
+    /(?:\b(?:gain|gains|gained|receive|receives|received|lose|loses|lost|spend|spends|spent|pay|pays|paid|earn|earns|earned)\b.{0,40}\b(?:gold|coins?|currency|credits?)\b|\b\d+\s+(?:gold|coins?|credits?)\b)/.test(
+      normalized,
+    );
+  const unsupportedQuest =
+    !hasKind("quest", "quest-lifecycle") &&
+    /(?:\bquest\b.{0,50}\b(?:accept|accepted|abandon|abandoned|advance|advanced|progress|complete|completed|reward|claimed)\b|\b(?:accept|accepted|abandon|abandoned|advance|advanced|complete|completed|claim|claimed)\b.{0,50}\bquest\b)/.test(
+      normalized,
+    );
+  const unsupportedProgression =
+    !hasKind("progression") &&
+    /\b(?:level(?:s|ed)?\s+up|advance(?:s|d)?\s+to\s+level|gain(?:s|ed)?\s+\d+\s+(?:xp|experience)|learn(?:s|ed)?\s+(?:a\s+)?new\s+(?:feature|ability|power))\b/.test(
+      normalized,
+    );
+  const unsupportedRecovery =
+    !hasKind("rest") && (recoveryClaimPattern.test(normalized) || restClaimPattern.test(normalized));
+  const unsupportedVitals =
+    !hasKind("rest", "combat", "combat-consumable", "combat-power", "power", "mechanic") &&
+    vitalNumberPattern.test(normalized);
+  const unsupportedCurrencyNumbers =
+    !hasKind("commerce", "quest-lifecycle") && currencyNumberPattern.test(normalized);
+  const unsupportedLevelNumbers = !hasKind("progression") && levelNumberPattern.test(normalized);
+  const unsupportedDcNumbers = !hasKind("check") && dcNumberPattern.test(normalized);
+  const transactionText = text
+    .toLocaleLowerCase("en-US")
+    .replace(/[^a-z0-9-]+/g, " ")
+    .trim();
+  const unsupportedTransaction =
+    !hasKind("commerce", "inventory", "quest-lifecycle") && assertsTransactionOrAcquisition(transactionText);
+  if (unsupportedTravel) return "unsupported-travel";
+  if (unsupportedInventory) return "unsupported-inventory";
+  if (unsupportedCurrency || unsupportedCurrencyNumbers) return "unsupported-currency";
+  if (unsupportedQuest) return "unsupported-quest";
+  if (unsupportedProgression || unsupportedLevelNumbers) return "unsupported-progression";
+  if (unsupportedRecovery) return "unsupported-recovery";
+  if (unsupportedVitals) return "unsupported-vitals";
+  if (unsupportedDcNumbers) return "check-outcome";
+  if (unsupportedTransaction) return "unsupported-transaction";
+  // A direct second-person purchase/sale is an invented transaction even when its object is a
+  // generic noun the narrow gate's item vocabulary does not enumerate.
+  if (
+    !hasKind("commerce", "inventory", "quest-lifecycle") &&
+    /\b(?:you|the party|the group)\s+(?:buy|buys|bought|purchase|purchases|purchased|sell|sells|sold)\b/.test(
+      transactionText,
+    )
+  )
+    return "unsupported-transaction";
+  if (values.length === 0) return null;
+  return providerNarrationMatchesReceipts(text, values, currentLocation) ? null : "grounding-mismatch";
+}
 type NarrationUsage = { promptTokens: number; completionTokens: number; totalTokens: number };
 function narrationUsageTotal(results: readonly ProviderCompletionResult[]): NarrationUsage | null {
   if (results.length === 0) return null;
@@ -1404,20 +1532,43 @@ function narrationTextFromResult(result: ProviderCompletionResult): string {
   return providerText;
 }
 /** The exact-facts repair instruction for the single bounded gate retry. */
-function narrationRepairMessage(input: {
+export function narrationRepairMessage(input: {
   values: readonly NarrationReceipt[];
   currentLocation: string | null;
   conversation: boolean;
   rejected: string;
+  failedRule: string | null;
 }): CompletionMessage {
   const facts = input.conversation
     ? "No mechanics are committed for this turn; the player's declaration establishes intent only."
     : `The only committed facts for this turn are:\n${composeNarration(input.values)}`;
+  const ruleGuidance: string[] = [];
+  if (input.failedRule) {
+    ruleGuidance.push(
+      `The previous submission failed the ${input.failedRule} rule, so that specific claim is not allowed.`,
+    );
+  }
+  if (
+    input.failedRule === "unsupported-transaction" ||
+    input.failedRule === "unsupported-inventory" ||
+    input.failedRule === "unsupported-currency"
+  ) {
+    ruleGuidance.push(
+      "Do not claim a purchase, assert a transaction, state a sale, or imply that goods, coin, or inventory changed hands.",
+    );
+  }
+  if (input.failedRule === "unsupported-damage") {
+    ruleGuidance.push("Do not state a damage number or imply an exact amount of harm.");
+  }
+  if (input.failedRule === "unsupported-healing") {
+    ruleGuidance.push("Do not state a healing number or imply that hit points were restored.");
+  }
   return {
     role: "user",
     content: [
       "GROUNDING CORRECTION: the previous submission failed the server's local grounding check.",
       "Rewrite the narration as one short passage and return it by calling submit_adventure_narration exactly once.",
+      ...ruleGuidance,
       facts,
       ...(input.currentLocation ? [`The actor's current location is ${input.currentLocation}.`] : []),
       input.conversation
@@ -1425,6 +1576,29 @@ function narrationRepairMessage(input: {
         : "State only these committed facts. Do not add, omit, round, or contradict any value, and never call a committed result pending or unresolved.",
       `Rejected draft (untrusted data, for reference only):\n${input.rejected.slice(0, 2_000)}`,
     ].join("\n\n"),
+  };
+}
+
+/** Maps the narration lane's internal decision state onto the small public debug vocabulary. */
+export function narrationDebugFields(input: {
+  hold: AdventureHold | undefined;
+  holdWarranted: boolean;
+  source: "provider-assisted" | "deterministic-fallback";
+  gateRule: string | null;
+  repairAttempted: boolean;
+  outcome?: NarrationOutcome;
+}): NarrationDebugFields {
+  const holdReason = input.holdWarranted && input.hold ? input.hold.reason : null;
+  let narrationOutcome: NarrationOutcome;
+  if (input.outcome) narrationOutcome = input.outcome;
+  else if (holdReason) narrationOutcome = "hold-skipped-provider";
+  else if (input.gateRule) narrationOutcome = input.repairAttempted ? "gate-rejected" : "repair-skipped";
+  else narrationOutcome = input.repairAttempted ? "repair-accepted" : "provider-accepted";
+  return {
+    holdReason,
+    gateRule: holdReason ? null : input.gateRule,
+    narrationOutcome,
+    repairAttempted: holdReason ? false : input.repairAttempted,
   };
 }
 /**
@@ -1473,31 +1647,57 @@ async function performNarration(
   // question, or meta hold is not a concrete action and keeps the provider-backed path unchanged.
   const presentNpcNames =
     safeReceipts?.length === 0 ? repo.getAdventureNarrationPresentNpcs(OWNER, turn.turnId).map((npc) => npc.name) : [];
+  const holdWarranted = Boolean(hold && holdNarrationIsWarranted(hold, turn.declaration, presentNpcNames));
+  const recordFallback = (text: string, outcome: NarrationOutcome): NarrationResult => {
+    recordNarrationDebug(turn.turnId, {
+      holdReason: null,
+      gateRule: null,
+      narrationOutcome: outcome,
+      repairAttempted: false,
+    });
+    return { turn, text, source: "deterministic-fallback" };
+  };
   const heldText = deliberateHoldNarration(
     hold && reachablePlaces.length && !hold.reachablePlaces?.length ? { ...hold, reachablePlaces } : hold,
     turn.declaration,
     safeReceipts ?? [],
     presentNpcNames,
   );
-  if (heldText) return { turn, text: heldText, source: "deterministic-fallback" };
+  if (heldText) {
+    recordNarrationDebug(turn.turnId, {
+      holdReason: holdWarranted && hold ? hold.reason : null,
+      gateRule: null,
+      narrationOutcome: "hold-skipped-provider",
+      repairAttempted: false,
+    });
+    return { turn, text: heldText, source: "deterministic-fallback" };
+  }
   let fallbackText = narrationFallback(turn.declaration, safeReceipts ?? [], { reachablePlaces });
-  if (!safeReceipts) return { turn, text: fallbackText, source: "deterministic-fallback" };
+  if (!safeReceipts) return recordFallback(fallbackText, "provider-error");
   const callId = key("narration-provider", turn.turnId);
   const recovered = repo.getNarrationProviderDispatch(OWNER, turn.turnId, callId);
-  if (recovered?.state === "settled") return finalizeNarrationDispatch(repo, turn.turnId, callId, recovered);
+  if (recovered?.state === "settled") {
+    const settled = finalizeNarrationDispatch(repo, turn.turnId, callId, recovered);
+    recordNarrationDebug(settled.turn.turnId, {
+      holdReason: null,
+      gateRule: null,
+      narrationOutcome: settled.source === "provider-assisted" ? "provider-accepted" : "provider-error",
+      repairAttempted: false,
+    });
+    return settled;
+  }
   // A client that disconnected before this narration started has no delivery target, so settle its
   // durable narration with the deterministic fallback instead of starting an undeliverable provider
   // call. A provider call already in flight for this turn is still awaited exactly as before.
   if (providerDisconnected && !recovered) {
     const publicContext = publicNarrationContext(repo, turn);
-    return {
-      turn,
-      text: narrationFallback(turn.declaration, safeReceipts, {
+    return recordFallback(
+      narrationFallback(turn.declaration, safeReceipts, {
         currentLocation: publicContext?.currentLocation ?? null,
         reachablePlaces,
       }),
-      source: "deterministic-fallback",
-    };
+      "disconnected",
+    );
   }
   let settings;
   try {
@@ -1506,7 +1706,7 @@ async function performNarration(
       dependencies ? dependencies.getHarness() : getHarnessSettings(),
     ]);
   } catch {
-    return { turn, text: fallbackText, source: "deterministic-fallback" };
+    return recordFallback(fallbackText, "provider-error");
   }
   const [provider, harness] = settings;
   let history;
@@ -1519,10 +1719,10 @@ async function performNarration(
       turn.actorId,
     );
   } catch {
-    return { turn, text: fallbackText, source: "deterministic-fallback" };
+    return recordFallback(fallbackText, "provider-error");
   }
   const publicContext = publicNarrationContext(repo, turn);
-  if (!publicContext) return { turn, text: fallbackText, source: "deterministic-fallback" };
+  if (!publicContext) return recordFallback(fallbackText, "provider-error");
   const actorState = buildActorStateContext({
     repo,
     principal: OWNER,
@@ -1631,7 +1831,16 @@ async function performNarration(
         leaseMs: 90_000,
       });
   }
-  if (claim.state === "settled") return finalizeNarrationDispatch(repo, turn.turnId, callId, claim);
+  if (claim.state === "settled") {
+    const settled = finalizeNarrationDispatch(repo, turn.turnId, callId, claim);
+    recordNarrationDebug(settled.turn.turnId, {
+      holdReason: null,
+      gateRule: null,
+      narrationOutcome: settled.source === "provider-assisted" ? "provider-accepted" : "provider-error",
+      repairAttempted: false,
+    });
+    return settled;
+  }
   const claimId = claim.claimId;
   try {
     turn = repo.recordProviderCallStart(OWNER, {
@@ -1664,12 +1873,17 @@ async function performNarration(
         fallbackNarration: fallbackText,
         leaseMs: 90_000,
       });
-    if (claim.state === "settled") return finalizeNarrationDispatch(repo, turn.turnId, callId, claim);
-    return {
-      turn: requirePrivate(repo.getAdventureTurn(OWNER, turn.turnId)),
-      text: fallbackText,
-      source: "deterministic-fallback",
-    };
+    if (claim.state === "settled") {
+      const settled = finalizeNarrationDispatch(repo, turn.turnId, callId, claim);
+      recordNarrationDebug(settled.turn.turnId, {
+        holdReason: null,
+        gateRule: null,
+        narrationOutcome: "provider-error",
+        repairAttempted: false,
+      });
+      return settled;
+    }
+    return recordFallback(fallbackText, "provider-error");
   }
   const policy = createAdventureTurnBudgetPolicy(provider);
   if (policy) initializeAdventureTurnBudget(turn, policy);
@@ -1697,12 +1911,17 @@ async function performNarration(
       promptTokens: null,
       completionTokens: null,
     });
-    if (claim.state === "settled") return finalizeNarrationDispatch(repo, turn.turnId, callId, claim);
-    return {
-      turn: requirePrivate(repo.getAdventureTurn(OWNER, turn.turnId)),
-      text: fallbackText,
-      source: "deterministic-fallback",
-    };
+    if (claim.state === "settled") {
+      const settled = finalizeNarrationDispatch(repo, turn.turnId, callId, claim);
+      recordNarrationDebug(settled.turn.turnId, {
+        holdReason: null,
+        gateRule: null,
+        narrationOutcome: "budget",
+        repairAttempted: false,
+      });
+      return settled;
+    }
+    return recordFallback(fallbackText, "budget");
   }
   const dispatch = dependencies?.complete ?? completeWithProvider;
   let measuredUsage: { promptTokens: number; completionTokens: number } | null = null;
@@ -1710,7 +1929,18 @@ async function performNarration(
   let usageEstimated = false;
   let promptTextEstimate = adventureProviderPromptEstimate(completionInput);
   const consumed: ProviderCompletionResult[] = [];
+  let attemptedRule: string | null = null;
+  let repairAttempted = false;
+  let debugOutcome: NarrationOutcome | null = null;
   try {
+    const gateRuleFor = (text: string): string | null => {
+      if (deniesActiveCombatEnemy(text, actorState)) return "enemy-denied";
+      return conversation
+        ? conversationNarrationMatches(text, publicContext.currentLocation)
+          ? null
+          : (narrationGateFailure(text, [], null) ?? "conversation-gate")
+        : narrationGateFailure(text, safeReceipts, publicContext.currentLocation);
+    };
     const gateAgainst = (text: string): boolean =>
       !deniesActiveCombatEnemy(text, actorState) &&
       (conversation
@@ -1719,15 +1949,20 @@ async function performNarration(
     let result = await completeNarrationDispatch(dispatch, completionInput, consumed);
     let providerText = narrationTextFromResult(result);
     // One bounded repair only. A syntactically valid narration that fails the local grounding gate
-    // gets a second provider attempt carrying the exact committed facts; transport, protocol, and
-    // malformed-argument failures never retry. The strict local gate still decides the final text.
-    if (!gateAgainst(providerText)) {
+    // gets a second provider attempt carrying the exact committed facts and the exact failed rule;
+    // transport, protocol, and malformed-argument failures never retry. The strict local gate still
+    // decides the final text.
+    let failedRule = gateAgainst(providerText) ? null : (gateRuleFor(providerText) ?? "grounding-mismatch");
+    if (failedRule) {
       // One bounded repair only, and only for a correctable near-miss that already names a
       // committed fact. A generic or fact-free draft skips straight to the receipt-bound fallback
       // so acceptance contracts that pin provider dispatch counts stay exact.
       if (!narrationRepairIsWorthwhile(providerText, safeReceipts, publicContext.currentLocation, conversation)) {
+        attemptedRule = failedRule;
+        debugOutcome = "repair-skipped";
         throw new Error("narration references no committed fact; deterministic fallback");
       }
+      repairAttempted = true;
       const repairInput: ProviderCompletionInput = {
         ...completionInput,
         messages: [
@@ -1737,14 +1972,22 @@ async function performNarration(
             currentLocation: publicContext.currentLocation,
             conversation,
             rejected: providerText,
+            failedRule,
           }),
         ],
       };
       promptTextEstimate = adventureProviderPromptEstimate(repairInput);
       result = await completeNarrationDispatch(dispatch, repairInput, consumed);
       providerText = narrationTextFromResult(result);
-      if (!gateAgainst(providerText))
+      failedRule = gateAgainst(providerText) ? null : (gateRuleFor(providerText) ?? "grounding-mismatch");
+      if (failedRule) {
+        attemptedRule = failedRule;
+        debugOutcome = "gate-rejected";
         throw new Error("narration contradicts or omits verified current facts after one repair");
+      }
+      debugOutcome = "repair-accepted";
+    } else {
+      debugOutcome = "provider-accepted";
     }
     const currentSnapshot = repo.getCampaignAgentContextSnapshot(OWNER, turn.campaignId, turn.sessionId, {
       kind: "player",
@@ -1783,6 +2026,12 @@ async function performNarration(
         "[narration-failed]",
         error instanceof Error ? `${error.name}: ${error.message.slice(0, 200)}` : "unknown",
       );
+    if (!debugOutcome) {
+      if (signal.aborted) debugOutcome = "disconnected";
+      else if (error instanceof SyntaxError || (error instanceof Error && /invalid narration response/.test(error.message)))
+        debugOutcome = "parse-failed";
+      else debugOutcome = "provider-error";
+    }
     if (!budgetSettled) {
       const charged = adventureTurnBudgets.settle(
         turn.turnId,
@@ -1803,6 +2052,19 @@ async function performNarration(
       completionTokens: measuredUsage?.completionTokens ?? null,
     });
   }
+  const finalDebugOutcome =
+    debugOutcome ??
+    (claim.state === "settled" && claim.source === "provider-assisted"
+      ? repairAttempted
+        ? "repair-accepted"
+        : "provider-accepted"
+      : "provider-error");
+  recordNarrationDebug(turn.turnId, {
+    holdReason: null,
+    gateRule: attemptedRule,
+    narrationOutcome: finalDebugOutcome,
+    repairAttempted,
+  });
   if (claim.state !== "settled")
     claim = repo.claimNarrationProviderDispatch(OWNER, {
       turnId: turn.turnId,
@@ -2092,6 +2354,7 @@ function reconcile(repo: Repo, turn: PrivateAdventureTurn) {
   const narration = repo.getAdventureTurnNarration(OWNER, turn.turnId);
   const callId = key("narration-provider", turn.turnId);
   const source = repo.getAdventureTurnNarrationSource(OWNER, turn.turnId);
+  const debug = narrationDebugByTurn.get(turn.turnId);
   return adventureTurnGetResponseSchema.parse({
     turn: projectTurn(turn),
     proposals: proposals(turn),
@@ -2101,6 +2364,14 @@ function reconcile(repo: Repo, turn: PrivateAdventureTurn) {
       status: turn.narrationStatus,
       text: narration,
       source: narration ? (source ?? "deterministic-fallback") : null,
+      ...(debug
+        ? {
+            ...(debug.holdReason ? { holdReason: debug.holdReason } : {}),
+            ...(debug.gateRule ? { gateRule: debug.gateRule } : {}),
+            narrationOutcome: debug.narrationOutcome,
+            repairAttempted: debug.repairAttempted,
+          }
+        : {}),
     },
     ...(token ? { resumeToken: token } : {}),
   });
