@@ -504,9 +504,13 @@ const NARRATION_META_SIGNAL =
   /\b(?:help|command|commands|rule|rules|system|sheet|inventory|stat|stats|status|respec|meta|ooc|gm|stash|developer|console|teleport|summon|cheat|hack)\b/;
 const NARRATION_TRAVEL_SIGNAL =
   /\b(?:travel|travels|traveled|journey|journeys|journeyed|walk|walks|walked|ride|rides|rode|march|marches|marched|return|returns|returned|leave|leaves|left|depart|departs|departed|move|moves|moved|enter|enters|entered|arrive|arrives|arrived|reach|reaches|reached|head|heads|headed|go|goes|went|path|road|route)\b/;
+const NARRATION_VITALS_SIGNAL = /\b(?:hit points?|hp|health)\b/;
+const NARRATION_VITALS_STATUS_SIGNAL = /\b(?:how|what|give|show|tell|check|report|count|many|much|badly)\b/;
 export interface NarrationFallbackContext {
   currentLocation?: string | null;
   reachablePlaces?: readonly string[];
+  health?: ActorStateContext["health"];
+  activeCombat?: ActorStateContext["activeCombat"];
 }
 
 function reachablePlaceSentence(places: readonly string[] | undefined, currentLocation: string | null): string {
@@ -536,6 +540,16 @@ function withReachablePlaces(
   return `${text}${reachablePlaceSentence(context?.reachablePlaces, currentLocation)}`;
 }
 
+function healthStatusFallback(health: { current: number; max: number }): string {
+  return `You are at ${health.current} of ${health.max} hit points. The wounds are real, but you are still standing.`;
+}
+
+function liveCombatFallback(context: NarrationFallbackContext | undefined): string | null {
+  const enemy = context?.activeCombat?.enemies.find((entry) => entry.name.trim())?.name.trim();
+  if (!enemy) return null;
+  return `You are already in the fight with the ${enemy}; your move joins the clash now underway.`;
+}
+
 function zeroReceiptFallback(
   declaration: string,
   currentLocation: string | null,
@@ -544,7 +558,9 @@ function zeroReceiptFallback(
   const text = normalizedNarration(declaration);
   if (!text) return withReachablePlaces(NARRATION_HOLD_TEXT, context, currentLocation);
   if (NARRATION_REST_SIGNAL.test(text)) return NARRATION_REST_FALLBACK;
-  if (NARRATION_COMBAT_SIGNAL.test(text)) return NARRATION_COMBAT_FALLBACK;
+  if (context?.health && NARRATION_VITALS_SIGNAL.test(text) && NARRATION_VITALS_STATUS_SIGNAL.test(text))
+    return healthStatusFallback(context.health);
+  if (NARRATION_COMBAT_SIGNAL.test(text)) return liveCombatFallback(context) ?? NARRATION_COMBAT_FALLBACK;
   if (NARRATION_META_SIGNAL.test(text))
     return withReachablePlaces(NARRATION_ILLEGAL_FALLBACK, context, currentLocation);
   if (NARRATION_CONVERSATION_SIGNAL.test(text)) return NARRATION_CONVERSATION_FALLBACK;
@@ -1054,6 +1070,17 @@ const restClaimPattern =
   /\b(?:(?:short|long)\s+)?rest\s+(?:completed|finished|taken|done)\b|\b(?:short|long)\s+rest\s+(?:is\s+)?(?:completed|finished|done)\b|\bfinish(?:es|ed)?\s+(?:your|the)\s+rest\b(?!\s+of\b)/;
 const vitalNumberPattern =
   /\b(?:health|hit points?|hp|hit dice)\b.{0,24}?\d|\d.{0,24}?\b(?:health|hit points?|hp|hit dice)\b/;
+// Second-person hit-point status is an honest restatement of actor state, not a change of place.
+const hpStatusClaimPattern =
+  /\b(?:you\s+are\s+at|you\s+re\s+at|you\s+have)\s+(\d+)\s+of\s+(\d+)\s+(?:hit points?|hp)\b/g;
+const hpStatusPhrasePattern = /\b(?:you are|you'?re|you have)\s+(?:at\s+)?\d+\s+of\s+\d+\s+(?:hit points?|hp)\b/gi;
+function hpStatusMatchesActorState(text: string, actorState: ActorStateContext | null): boolean {
+  const health = actorState?.health;
+  if (!health) return false;
+  const matches = [...normalizedNarration(text).matchAll(hpStatusClaimPattern)];
+  if (matches.length === 0) return false;
+  return matches.every((match) => Number(match[1]) === health.current && Number(match[2]) === health.max);
+}
 const currencyNumberPattern =
   /\b(?:gold|coins?|currency|credits?)\b.{0,24}?\d|\d.{0,24}?\b(?:gold|coins?|currency|credits?)\b/;
 const levelNumberPattern = /\blevels?\b.{0,12}?\d|\d.{0,12}?\blevels?\b/;
@@ -1360,7 +1387,9 @@ export function narrationGateFailure(
   actorState: ActorStateContext | null = null,
 ): string | null {
   if (deniesActiveCombatEnemy(text, actorState)) return "enemy-denied";
-  if (!acknowledgesCurrentLocation(text, currentLocation)) return "current-location";
+  const honestVitals = hpStatusMatchesActorState(text, actorState);
+  if (!acknowledgesCurrentLocation(honestVitals ? text.replace(hpStatusPhrasePattern, "") : text, currentLocation))
+    return "current-location";
   const normalized = normalizedNarration(text);
   if (
     currentLocation &&
@@ -1433,7 +1462,7 @@ export function narrationGateFailure(
   if (unsupportedQuest) return "unsupported-quest";
   if (unsupportedProgression || unsupportedLevelNumbers) return "unsupported-progression";
   if (unsupportedRecovery) return "unsupported-recovery";
-  if (unsupportedVitals) return "unsupported-vitals";
+  if (unsupportedVitals && !honestVitals) return "unsupported-vitals";
   if (unsupportedDcNumbers) return "check-outcome";
   if (unsupportedTransaction) return "unsupported-transaction";
   // A direct second-person purchase/sale is an invented transaction even when its object is a
@@ -1748,6 +1777,8 @@ async function performNarration(
   fallbackText = narrationFallback(turn.declaration, safeReceipts, {
     currentLocation: publicContext.currentLocation,
     reachablePlaces,
+    health: actorState.health,
+    activeCombat: actorState.activeCombat,
   });
   // An original nonmechanical exchange also needs conversation narration on its first response,
   // including a resume after planning where the transient hold object is no longer available.
