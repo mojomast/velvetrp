@@ -506,6 +506,10 @@ const NARRATION_TRAVEL_SIGNAL =
   /\b(?:travel|travels|traveled|journey|journeys|journeyed|walk|walks|walked|ride|rides|rode|march|marches|marched|return|returns|returned|leave|leaves|left|depart|departs|departed|move|moves|moved|enter|enters|entered|arrive|arrives|arrived|reach|reaches|reached|head|heads|headed|go|goes|went|path|road|route)\b/;
 const NARRATION_VITALS_SIGNAL = /\b(?:hit points?|hp|health)\b/;
 const NARRATION_VITALS_STATUS_SIGNAL = /\b(?:how|what|give|show|tell|check|report|count|many|much|badly)\b/;
+const NARRATION_WOUND_STATUS_SIGNAL =
+  /\b(?:my|your)\s+(?:wounds?|injuries?)\b|\bhow badly am i hurt\b|\bam i (?:hurt|wounded|injured)\b/;
+const NARRATION_SOCIAL_GESTURE_SIGNAL =
+  /\b(?:bow|bows|bowed|bowing|nod|nods|nodded|nodding|smile|smiles|smiled|smiling)\b/;
 export interface NarrationFallbackContext {
   currentLocation?: string | null;
   reachablePlaces?: readonly string[];
@@ -550,6 +554,13 @@ function liveCombatFallback(context: NarrationFallbackContext | undefined): stri
   return `You are already in the fight with the ${enemy}; your move joins the clash now underway.`;
 }
 
+function isPrimarilySocialDeclaration(declaration: string, text: string): boolean {
+  if (/["“”]/.test(declaration)) return true;
+  if (declaration.includes("?")) return true;
+  if (NARRATION_SOCIAL_GESTURE_SIGNAL.test(text)) return true;
+  return /\baccept(?:s|ed|ing)?\s+(?:the\s+)?(?:cup|drink|gift|offering)\b/.test(text);
+}
+
 function zeroReceiptFallback(
   declaration: string,
   currentLocation: string | null,
@@ -558,12 +569,17 @@ function zeroReceiptFallback(
   const text = normalizedNarration(declaration);
   if (!text) return withReachablePlaces(NARRATION_HOLD_TEXT, context, currentLocation);
   if (NARRATION_REST_SIGNAL.test(text)) return NARRATION_REST_FALLBACK;
-  if (context?.health && NARRATION_VITALS_SIGNAL.test(text) && NARRATION_VITALS_STATUS_SIGNAL.test(text))
+  if (
+    context?.health &&
+    (NARRATION_VITALS_SIGNAL.test(text) || NARRATION_WOUND_STATUS_SIGNAL.test(text)) &&
+    NARRATION_VITALS_STATUS_SIGNAL.test(text)
+  )
     return healthStatusFallback(context.health);
   if (NARRATION_COMBAT_SIGNAL.test(text)) return liveCombatFallback(context) ?? NARRATION_COMBAT_FALLBACK;
   if (NARRATION_META_SIGNAL.test(text))
     return withReachablePlaces(NARRATION_ILLEGAL_FALLBACK, context, currentLocation);
   if (NARRATION_CONVERSATION_SIGNAL.test(text)) return NARRATION_CONVERSATION_FALLBACK;
+  if (isPrimarilySocialDeclaration(declaration, text)) return NARRATION_CONVERSATION_FALLBACK;
   if (NARRATION_TRAVEL_SIGNAL.test(text) || /\bset (?:out|off)\b|\bmake for\b/.test(text)) {
     return withReachablePlaces(
       currentLocation && mentionsFact(declaration, currentLocation)
