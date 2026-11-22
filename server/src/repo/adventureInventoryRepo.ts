@@ -253,6 +253,29 @@ function frame(
   };
 }
 
+function advertisedCandidatesBindToBatch(requestProjection: any, durableProjectionJson: string): boolean {
+  const advertised = stripCandidateLabels(requestProjection),
+    durable = JSON.parse(durableProjectionJson);
+  const advertisedCandidates = Array.isArray(advertised.candidates) ? advertised.candidates : [],
+    durableCandidates = Array.isArray(durable?.candidates) ? durable.candidates : [];
+  if (
+    advertised.version !== "v1" ||
+    durable?.version !== "v1" ||
+    advertisedCandidates.length === 0 ||
+    advertisedCandidates.length > durableCandidates.length
+  )
+    return false;
+  let cursor = 0;
+  for (const candidate of advertisedCandidates) {
+    const rendered = canonicalAgentJson(candidate as never);
+    while (cursor < durableCandidates.length && canonicalAgentJson(durableCandidates[cursor] as never) !== rendered)
+      cursor += 1;
+    if (cursor === durableCandidates.length) return false;
+    cursor += 1;
+  }
+  return true;
+}
+
 export function createAdventureInventoryRepository(
   db: DatabaseDriver.Database,
   deps: M15Dependencies,
@@ -466,7 +489,7 @@ export function createAdventureInventoryRepository(
             sha(response.request_json) !== response.request_digest ||
             sha(response.response_json) !== response.response_digest ||
             sha(response.projection_json) !== response.projection_digest ||
-            canonicalAgentJson(stripCandidateLabels(requestProjection) as never) !== response.projection_json ||
+            !advertisedCandidatesBindToBatch(requestProjection, response.projection_json) ||
             !request.advertisedTools?.includes("exact_inventory_action.select") ||
             canonicalAgentJson(tool?.parameters as never) !== canonicalAgentJson(expectedParameters as never) ||
             call?.toolName !== "exact_inventory_action.select" ||
