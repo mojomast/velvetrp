@@ -1580,6 +1580,45 @@ export function selectHeldRestCandidate<T extends { restKind: "short" | "long" }
   return null;
 }
 
+/** Explicit drinking verbs that can name a held potion as the object of the declaration. */
+const DRINK_VERB =
+  /\b(?:drink|drinks|drinking|drank|drunk|quaff|quaffs|quaffing|quaffed|swig|swigs|swigging|swigged|gulp|gulps|gulping|gulped|sip|sips|sipping|sipped)\b/u;
+const HEALING_POTION_LABEL = /\bpotion\b[\s\S]*\bheal|\bheal[\s\S]*\bpotion\b/iu;
+
+/**
+ * The advertised consume candidate a clear drinking declaration names, or null. Only a held
+ * healing potion row qualifies: the declaration must carry a direct drink verb and name a potion
+ * or healing, and the candidate itself must be a consume action whose public label is a healing
+ * potion. A generic "potion" declaration never selects a non-potion consumable. When several
+ * healing potions are held, the candidate whose distinctive label words the declaration names
+ * most fully wins; ties fall back to the repository's deterministic candidate order.
+ */
+export function selectHeldHealingPotionConsumeCandidate<T extends { action: string; itemLabel: string }>(
+  declaration: string,
+  candidates: readonly T[],
+): T | null {
+  if (candidates.length === 0 || !isDirectDeclarationAttempt(declaration)) return null;
+  const text = normalized(declaration);
+  if (!DRINK_VERB.test(text)) return null;
+  if (!/\bpotion\b/u.test(text) && !/\bheal/u.test(text)) return null;
+  const held = candidates.filter(
+    (candidate) => candidate.action === "consume" && HEALING_POTION_LABEL.test(candidate.itemLabel),
+  );
+  if (held.length === 0) return null;
+  const named = held.filter((candidate) => mentionsLabel(declaration, candidate.itemLabel));
+  const pool = named.length > 0 ? named : held;
+  let best = pool[0]!;
+  let bestScore = -1;
+  for (const candidate of pool) {
+    const score = normalizedWords(candidate.itemLabel).filter((word) => text.includes(word)).length;
+    if (score > bestScore) {
+      best = candidate;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
 /** Transfer verbs whose recipient must be a present counterparty, never the actor. */
 const COMMERCE_TRANSFER_VERB =
   /\b(?:give|gives|gave|given|gift|gifts|gifted|gifting|hand|hands|handed|handing|donate|donates|donated|donating)\b/u;
@@ -2651,6 +2690,7 @@ export async function orchestrateAdventureTurn(
       /* Combat powers fail closed. */
     }
   }
+  const heldHealingPotion = selectHeldHealingPotionConsumeCandidate(turn.declaration, inventoryCandidates);
   const providerTravel = selectTravelCandidates(
     exactTravel.candidates,
     turn.declaration,
@@ -3373,6 +3413,32 @@ export async function orchestrateAdventureTurn(
         ...completionInput,
         signal: AbortSignal.any([AbortSignal.timeout(remainingMs), ...(signal ? [signal] : [])]),
       });
+      // A clear drink declaration with a matching held healing potion names an advertised consume
+      // row outright. When the provider returns only stay-put prose (or no usable call) instead of
+      // selecting that row, settle the same advertised candidate here and let the ordinary
+      // confirmation gate decide. This maps an exact server-issued candidate only: adventure
+      // consume stays inventory-only, and no healing or hit-point effect is invented.
+      if (
+        heldHealingPotion &&
+        !(result.message.toolCalls ?? []).some((call) => selected.some((tool) => tool.name === call.name))
+      )
+        result = {
+          ...result,
+          message: {
+            ...result.message,
+            content: null,
+            toolCalls: [
+              {
+                id: id("agent-held-potion", turn.turnId, heldHealingPotion.candidateId),
+                name: "exact_inventory_action.select",
+                arguments: canonicalAgentJson({
+                  candidateId: heldHealingPotion.candidateId,
+                  digest: heldHealingPotion.digest,
+                }),
+              },
+            ],
+          },
+        };
       measuredUsage = result.usage;
       const completionText =
         result.message.content ?? result.message.toolCalls?.map((call) => call.arguments).join("\n");
