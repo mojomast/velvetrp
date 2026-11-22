@@ -1,11 +1,14 @@
-// Approved tests from the round-5 playtest.
+// Approved tests from the round-5 and round-7 playtests.
 // Mech turn 4 declared "I drink a healing potion." while holding potions of
 // greater/superior/supreme healing. The provider never selected the advertised
 // consume candidate; repair accepted stay-put narration ("flask resting
 // unopened" / "Nothing has changed yet") and the inventory was unchanged.
-// A clear drink declaration with a matching held potion must propose consume
-// instead of settling as a no-op. Adventure consume remains inventory-only
-// (no invented healing effects).
+// After #52, a live drink still settled as provider-accepted narration of a
+// fabricated successful drink when the provider called an advertised
+// non-consume tool (for example campaign_context.read) and never selected the
+// consume row. A clear drink declaration with a matching held potion must
+// propose consume in both cases instead of settling as a no-op. Adventure
+// consume remains inventory-only (no invented healing effects).
 import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -239,6 +242,93 @@ describe("drinking a held healing potion consumes it", () => {
     const text = JSON.stringify(resumed);
     expect(text).not.toMatch(/unopened/i);
     expect(text).not.toMatch(/nothing has changed yet/i);
+    expect(text).not.toMatch(/\bhit points?\b/i);
+    f.repo.close();
+  });
+
+  it("proposes consume when the provider fabricates a successful drink after selecting a non-consume tool", async () => {
+    // Live miss after #52: the hook only injects consume when the planning complete() result
+    // has no selected tool call at all. A real provider often calls an advertised read
+    // (campaign_context.read / actor_inventory.read) and never selects the consume row;
+    // planning then ends and performNarration accepts fabricated success prose, leaving
+    // receipts empty and inventory unchanged. This case must still propose the advertised
+    // consume candidate. Adventure consume stays inventory-only (no invented HP).
+    const f = fixture();
+    const before = f.repo.getActorInventorySnapshot("local-owner", f.campaign.id, f.source.actorId)!;
+    const waylampItems = (before.inventory.items || []).filter((item: any) =>
+      String(item.item?.definitionId || "").includes("waylamp"),
+    );
+    expect(waylampItems.length).toBeGreaterThan(0);
+    const quantityBefore = waylampItems.reduce((sum: number, item: any) => sum + (item.quantity ?? 1), 0);
+
+    const turn = makeTurn(f, "I drink a healing potion.");
+    const consume = f.repo
+      .generateAdventureInventoryCandidates("local-owner", turn.turnId)
+      .find((value) => value.action === "consume" && /potion of greater healing/i.test(value.itemLabel));
+    expect(consume).toBeDefined();
+
+    const FABRICATED =
+      "You work the stopper loose from a vial of greater healing and tip it back. Warmth spreads from your throat to your fingertips, the ache of old bruises thinning away; you are unhurt and whole as you were, the vial now one fewer in your satchel.";
+
+    const result = await orchestrateAdventureTurn(
+      f.repo,
+      turn.turnId,
+      deps(async () => ({
+        message: {
+          role: "assistant",
+          content: FABRICATED,
+          toolCalls: [
+            {
+              id: `read-call-${++key}`,
+              name: "campaign_context.read",
+              arguments: "{}",
+            },
+          ],
+        },
+        usage: null,
+        model: { requestedModel: "fake", responseModel: "fake" },
+      })),
+    );
+    expect(result.outcome, JSON.stringify(result.turn)).toBe("awaiting-confirmation");
+    expect(result.turn.receiptLinks).toHaveLength(0);
+    const proposal = result.turn.toolCalls[0]!.proposal;
+    expect(proposal.toolName).toBe("inventory_item_consume");
+    expect(JSON.stringify(proposal)).toMatch(/Potion of Greater Healing/);
+
+    const decided = f.repo.decideToolProposals("local-owner", {
+      turnId: turn.turnId,
+      proposalIds: [proposal.proposalId],
+      decision: "approved",
+      expectedTurnRevision: result.turn.revision,
+      expectedCampaignRevision: 1,
+      idempotencyKey: `approve-${++key}`,
+    });
+    const resumed = await orchestrateAdventureTurn(
+      f.repo,
+      turn.turnId,
+      deps(async () => {
+        throw new Error("must not redispatch after consume approval");
+      }),
+    );
+    expect(decided.state).toBe("confirmed");
+    expect(resumed.outcome).toBe("completed");
+    const receipt = f.repo.getAdventureInventoryPublicReceipt(
+      "local-owner",
+      f.campaign.id,
+      resumed.turn.receiptLinks[0]!.commandId,
+    )!;
+    expect(receipt).toMatchObject({
+      itemLabel: "Potion of Greater Healing",
+      action: "consume",
+      quantity: 1,
+    });
+    const after = f.repo.getActorInventorySnapshot("local-owner", f.campaign.id, f.source.actorId)!;
+    const remaining = (after.inventory.items || []).filter((item: any) =>
+      String(item.item?.definitionId || "").includes("waylamp"),
+    );
+    const quantityAfter = remaining.reduce((sum: number, item: any) => sum + (item.quantity ?? 1), 0);
+    expect(quantityAfter).toBe(quantityBefore - 1);
+    const text = JSON.stringify(resumed);
     expect(text).not.toMatch(/\bhit points?\b/i);
     f.repo.close();
   });
