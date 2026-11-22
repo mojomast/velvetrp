@@ -1239,12 +1239,22 @@ const PROGRESSION_WORDS = /\b(?:level|levels|progression|multiclass|advance|adva
 
 /** A compound whose parts are joined by a hyphen, such as a hyphenated place name. */
 const HYPHENATED_COMPOUND = /\b[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)+\b/gu;
+/** A clause phrased as a question, even when its interrogative sits beside a locative. */
+const QUESTION_CLAUSE =
+  /\b(?:do|does|did|is|are|was|were|have|has|had|can|could|would|should|will|shall|may|might)\s+(?:i|you|he|she|it|we|they|there)\b|^(?:who|what|when|where|why|how|which|whose|whether)\b|\bwhether\b/u;
+
+/** A clause that asks a question or reports speech: its words describe talk, not a deed. */
+function clauseConverses(text: string): boolean {
+  return TOPIC_SPEECH_WORDS.test(text) || QUESTION_CLAUSE.test(text);
+}
 
 function clauseIntent(text: string): DeclarationIntentStep {
   const check = mapDeclarationToCheck(text) !== null;
   // A family word joined to another word by a hyphen is part of a compound, not an action word:
   // drop the whole compound before matching so "head" in "Slake-Head" is never travel.
   const actionText = text.replace(HYPHENATED_COMPOUND, " ");
+  // "Accept" or "hand" inside a question or quoted speech is talk about a deed, never that deed.
+  const converses = clauseConverses(actionText);
   return {
     text,
     commerce: COMMERCE_WORDS.test(actionText),
@@ -1252,8 +1262,8 @@ function clauseIntent(text: string): DeclarationIntentStep {
     check,
     combat: COMBAT_WORDS.test(actionText),
     travel: TRAVEL_WORDS.test(actionText) || TRAVEL_PHRASES.test(actionText),
-    give: GIVE_WORDS.test(actionText),
-    quest: QUEST_WORDS.test(actionText),
+    give: !converses && GIVE_WORDS.test(actionText),
+    quest: !converses && QUEST_WORDS.test(actionText),
     progression: PROGRESSION_WORDS.test(actionText),
   };
 }
@@ -1447,7 +1457,7 @@ function clauseStagesDestination(clause: string, name: string): boolean {
     scrubbed = scrubbed.split(`${prefix} the ${value}`).join(" ");
   }
   if (!containsWholePhrase(scrubbed.split(" ").filter(Boolean), value.split(" ").filter(Boolean))) return false;
-  if (TOPIC_SPEECH_WORDS.test(text)) return false;
+  if (clauseConverses(text)) return false;
   return TRAVEL_WORDS.test(text) || TRAVEL_PHRASES.test(text) || SPRINT_WORDS.test(text) || LOCATIVE_WORDS.test(text);
 }
 
