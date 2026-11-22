@@ -3414,14 +3414,25 @@ export async function orchestrateAdventureTurn(
         signal: AbortSignal.any([AbortSignal.timeout(remainingMs), ...(signal ? [signal] : [])]),
       });
       // A clear drink declaration with a matching held healing potion names an advertised consume
-      // row outright. When the provider returns only stay-put prose (or no usable call) instead of
-      // selecting that row, settle the same advertised candidate here and let the ordinary
-      // confirmation gate decide. This maps an exact server-issued candidate only: adventure
-      // consume stays inventory-only, and no healing or hit-point effect is invented.
-      if (
-        heldHealingPotion &&
-        !(result.message.toolCalls ?? []).some((call) => selected.some((tool) => tool.name === call.name))
-      )
+      // row outright. When the provider selects anything other than that exact row — stay-put prose,
+      // no usable call, or an advertised read such as campaign_context.read alongside fabricated
+      // success prose — settle the same advertised candidate here and let the ordinary confirmation
+      // gate decide. This maps an exact server-issued candidate only: adventure consume stays
+      // inventory-only, and no healing or hit-point effect is invented.
+      const providerSelectedHeldPotion =
+        heldHealingPotion !== null &&
+        (result.message.toolCalls ?? []).some((call) => {
+          if (call.name !== "exact_inventory_action.select") return false;
+          try {
+            const arguments_ = JSON.parse(call.arguments) as { candidateId?: unknown; digest?: unknown };
+            return (
+              arguments_.candidateId === heldHealingPotion.candidateId && arguments_.digest === heldHealingPotion.digest
+            );
+          } catch {
+            return false;
+          }
+        });
+      if (heldHealingPotion && !providerSelectedHeldPotion)
         result = {
           ...result,
           message: {
