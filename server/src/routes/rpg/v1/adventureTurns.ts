@@ -507,7 +507,9 @@ const NARRATION_TRAVEL_SIGNAL =
 const NARRATION_VITALS_SIGNAL = /\b(?:hit points?|hp|health)\b/;
 const NARRATION_VITALS_STATUS_SIGNAL = /\b(?:how|what|give|show|tell|check|report|count|many|much|badly)\b/;
 const NARRATION_WOUND_STATUS_SIGNAL =
-  /\b(?:my|your)\s+(?:wounds?|injuries?)\b|\bhow badly am i hurt\b|\bam i (?:hurt|wounded|injured)\b/;
+  /\b(?:my|your)\s+(?:wounds?|injuries?)\b|\bhow badly am i hurt\b|\bhow bad (?:is it|am i)\b|\bam i (?:hurt|wounded|injured)\b/;
+const NARRATION_DIRECTION_REQUEST_SIGNAL =
+  /\b(?:point me|point the way|direct me|show me the way|which way|directions? to|how do i get)\b/;
 const NARRATION_SOCIAL_GESTURE_SIGNAL =
   /\b(?:bow|bows|bowed|bowing|nod|nods|nodded|nodding|smile|smiles|smiled|smiling)\b/;
 export interface NarrationFallbackContext {
@@ -548,6 +550,27 @@ function healthStatusFallback(health: { current: number; max: number }): string 
   return `You are at ${health.current} of ${health.max} hit points. The wounds are real, but you are still standing.`;
 }
 
+function woundStatusFallback(
+  declaration: string,
+  health: { current: number; max: number } | null | undefined,
+): string | null {
+  if (!health) return null;
+  const text = normalizedNarration(declaration);
+  if (!(NARRATION_VITALS_SIGNAL.test(text) || NARRATION_WOUND_STATUS_SIGNAL.test(text))) return null;
+  return NARRATION_VITALS_STATUS_SIGNAL.test(text) ? healthStatusFallback(health) : null;
+}
+
+function withWoundStatusHealth(
+  text: string,
+  declaration: string,
+  health: { current: number; max: number } | null | undefined,
+): string {
+  const report = woundStatusFallback(declaration, health);
+  if (!report || !health) return text;
+  if (includesNumber(text, health.current) && includesNumber(text, health.max)) return text;
+  return `${text.trimEnd()} ${report}`;
+}
+
 function liveCombatFallback(context: NarrationFallbackContext | undefined): string | null {
   const enemy = context?.activeCombat?.enemies.find((entry) => entry.name.trim())?.name.trim();
   if (!enemy) return null;
@@ -569,16 +592,13 @@ function zeroReceiptFallback(
   const text = normalizedNarration(declaration);
   if (!text) return withReachablePlaces(NARRATION_HOLD_TEXT, context, currentLocation);
   if (NARRATION_REST_SIGNAL.test(text)) return NARRATION_REST_FALLBACK;
-  if (
-    context?.health &&
-    (NARRATION_VITALS_SIGNAL.test(text) || NARRATION_WOUND_STATUS_SIGNAL.test(text)) &&
-    NARRATION_VITALS_STATUS_SIGNAL.test(text)
-  )
-    return healthStatusFallback(context.health);
+  const woundStatus = woundStatusFallback(declaration, context?.health);
+  if (woundStatus) return woundStatus;
   if (NARRATION_COMBAT_SIGNAL.test(text)) return liveCombatFallback(context) ?? NARRATION_COMBAT_FALLBACK;
   if (NARRATION_META_SIGNAL.test(text))
     return withReachablePlaces(NARRATION_ILLEGAL_FALLBACK, context, currentLocation);
-  if (NARRATION_CONVERSATION_SIGNAL.test(text)) return NARRATION_CONVERSATION_FALLBACK;
+  if (NARRATION_CONVERSATION_SIGNAL.test(text) || NARRATION_DIRECTION_REQUEST_SIGNAL.test(text))
+    return NARRATION_CONVERSATION_FALLBACK;
   if (isPrimarilySocialDeclaration(declaration, text)) return NARRATION_CONVERSATION_FALLBACK;
   if (NARRATION_TRAVEL_SIGNAL.test(text) || /\bset (?:out|off)\b|\bmake for\b/.test(text)) {
     return withReachablePlaces(
@@ -2080,6 +2100,7 @@ async function performNarration(
     } else {
       debugOutcome = "provider-accepted";
     }
+    providerText = withWoundStatusHealth(providerText, turn.declaration, actorState.health);
     const currentSnapshot = repo.getCampaignAgentContextSnapshot(principalId, turn.campaignId, turn.sessionId, {
       kind: "player",
       actorId: turn.actorId,
