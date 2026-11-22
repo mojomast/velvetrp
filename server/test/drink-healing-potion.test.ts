@@ -17,6 +17,8 @@ import { defaultHarnessSettings, defaultProviderSettings } from "../src/defaults
 import { orchestrateAdventureTurn, type AdventureAgentDependencies } from "../src/agent/adventureOrchestrator.js";
 import { createRepository, MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
 import type { ProviderCompletionInput, ProviderCompletionResult } from "../src/provider/index.js";
+import { adventureTurnStreamEventSchema } from "@velvet/contracts";
+import { buildApp } from "../src/app.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -331,5 +333,168 @@ describe("drinking a held healing potion consumes it", () => {
     const text = JSON.stringify(resumed);
     expect(text).not.toMatch(/\bhit points?\b/i);
     f.repo.close();
+  });
+
+  it("commits the consume over HTTP after the player approves the proposal", async () => {
+    // Live miss after #55 on a quick adventure: stream proposed inventory_item_consume
+    // and POST confirm returned 200, but the turn stayed declared with no receipts;
+    // resume then ended error/cancelled and the inventory was unchanged. Approve must
+    // commit the consume (receipt + quantity-1) before or during resume narration.
+    // Adventure consume stays inventory-only (no invented HP).
+    process.env.FEATURE_RPG_CAMPAIGN = "true";
+    process.env.FEATURE_RPG_MECHANICS = "true";
+    process.env.FEATURE_RPG_COMBAT = "true";
+
+    const FABRICATED =
+      "You work the stopper loose from a vial of greater healing and tip it back. The vial is now one fewer in your satchel.";
+    const AFTER = "The empty vial is stowed. You remain where you were, with no change to your wounds.";
+    let planningCalls = 0;
+    const liveDeps = deps(async () => {
+      planningCalls += 1;
+      if (planningCalls === 1)
+        return {
+          message: {
+            role: "assistant",
+            content: FABRICATED,
+            toolCalls: [{ id: `read-call-${++key}`, name: "campaign_context.read", arguments: "{}" }],
+          },
+          usage: null,
+          model: { requestedModel: "fake", responseModel: "fake" },
+        };
+      return narration(AFTER);
+    });
+    liveDeps.now = () => new Date();
+    const app = buildApp({ adventureAgentDependencies: liveDeps });
+    const streamEvents = (body: string) =>
+      body
+        .split("\n\n")
+        .filter((frame) => frame.startsWith("event: "))
+        .map((frame) => {
+          const data = frame
+            .split("\n")
+            .find((line) => line.startsWith("data: "))!
+            .slice(6);
+          return adventureTurnStreamEventSchema.parse(JSON.parse(data));
+        });
+    const potionRows = (inv: any) =>
+      (inv.entries || inv.inventory?.items || []).filter((entry: any) =>
+        /potion/i.test(String(entry.item?.name || entry.item?.definitionId || entry.itemLabel || "")),
+      );
+    const potionQty = (inv: any) => potionRows(inv).reduce((sum: number, entry: any) => sum + (entry.quantity ?? 1), 0);
+    const publicTurn = (body: any) => ({
+      state: body.turn?.state,
+      receiptCount: (body.receipts || []).length,
+      confirmation: body.confirmation?.state,
+      decisions: (body.confirmation?.decisions || []).map((decision: any) => decision.decision),
+    });
+
+    try {
+      const created = await app.inject({
+        method: "POST",
+        url: "/api/rpg/v1/quick-adventures",
+        payload: { idempotencyKey: `http-potion-qa-${++key}` },
+      });
+      expect(created.statusCode, created.body).toBe(201);
+      const ids = created.json() as { campaignId: string; sessionId: string; actorId: string };
+      const invUrl = `/api/rpg/v1/campaigns/${ids.campaignId}/actors/${ids.actorId}/inventory`;
+      const before = (await app.inject({ method: "GET", url: invUrl })).json();
+      expect(potionQty(before), JSON.stringify(before).slice(0, 800)).toBeGreaterThan(0);
+      const quantityBefore = potionQty(before);
+
+      const boot = await app.inject({
+        method: "GET",
+        url: `/api/rpg/v1/campaigns/${ids.campaignId}/rooms/${encodeURIComponent(ids.sessionId)}/play-bootstrap`,
+      });
+      expect(boot.statusCode, boot.body).toBe(200);
+
+      const streamed = await app.inject({
+        method: "POST",
+        url: "/api/rpg/v1/adventure-turns/stream",
+        headers: { "content-type": "application/json", accept: "text/event-stream" },
+        payload: {
+          campaignId: ids.campaignId,
+          sessionId: ids.sessionId,
+          actorId: ids.actorId,
+          declaration: "I drink a healing potion.",
+          expectedRevision: boot.json().expectedRevision,
+          idempotencyKey: `http-drink-${++key}`,
+        },
+      });
+      expect(streamed.statusCode, streamed.body.slice(0, 1500)).toBe(200);
+      const streamEv = streamEvents(streamed.body);
+      expect(
+        streamEv.map((event) => event.type),
+        streamed.body.slice(0, 1500),
+      ).toContain("confirmation_required");
+      const proposed = streamEv.find((event) => event.type === "tool_proposed");
+      expect(proposed && proposed.type === "tool_proposed" ? proposed.payload.proposal.toolName : "").toBe(
+        "inventory_item_consume",
+      );
+      const pending = streamEv.find((event) => event.type === "confirmation_required");
+      if (!pending || pending.type !== "confirmation_required") throw new Error("missing confirmation_required");
+      const terminal = streamEv.at(-1);
+      const turnId =
+        (streamed.headers["x-adventure-turn-id"] as string) ||
+        (terminal && terminal.type === "terminal" ? terminal.payload.turn.turnId : "");
+      expect(turnId).toBeTruthy();
+      const expectedRevision = terminal && terminal.type === "terminal" ? terminal.payload.turn.revision : 0;
+
+      const confirmed = await app.inject({
+        method: "POST",
+        url: `/api/rpg/v1/adventure-turns/${turnId}/confirm`,
+        headers: { "content-type": "application/json" },
+        payload: {
+          proposalIds: pending.payload.proposalIds,
+          decision: "approve",
+          expectedRevision,
+          idempotencyKey: `http-confirm-${++key}`,
+        },
+      });
+      expect(confirmed.statusCode, `confirm status ${confirmed.statusCode}`).toBe(200);
+      const token = confirmed.json().resumeToken as string | undefined;
+      expect(Boolean(token), "confirm should return a resume token").toBe(true);
+
+      if (token) {
+        const resumed = await app.inject({
+          method: "POST",
+          url: "/api/rpg/v1/adventure-turns/stream",
+          headers: { "content-type": "application/json", accept: "text/event-stream" },
+          payload: { resumeToken: token },
+        });
+        expect(resumed.statusCode, resumed.body.slice(0, 1500)).toBe(200);
+        const resumeEv = streamEvents(resumed.body);
+        const resumeTerminal = resumeEv.at(-1);
+        const resumeView = {
+          types: resumeEv.map((event) => event.type),
+          outcome: resumeTerminal && resumeTerminal.type === "terminal" ? resumeTerminal.payload.outcome : "",
+          state: resumeTerminal && resumeTerminal.type === "terminal" ? resumeTerminal.payload.turn.state : "",
+        };
+        expect(resumeView.outcome, JSON.stringify(resumeView)).not.toBe("error");
+        expect(resumeView.state, JSON.stringify(resumeView)).not.toBe("cancelled");
+      }
+
+      const read = await app.inject({ method: "GET", url: `/api/rpg/v1/adventure-turns/${turnId}` });
+      const body = read.json();
+      const receipts = body.receipts || [];
+      expect(receipts.length, JSON.stringify(publicTurn(body))).toBeGreaterThan(0);
+      const commandId = receipts[0]?.commandId as string;
+      expect(commandId, JSON.stringify(publicTurn(body))).toBeTruthy();
+      const receipt = await app.inject({
+        method: "GET",
+        url: `/api/rpg/v1/campaigns/${ids.campaignId}/commands/${commandId}/receipt`,
+      });
+      expect(receipt.statusCode, receipt.body.slice(0, 800)).toBe(200);
+      expect(receipt.json().receipt, receipt.body.slice(0, 800)).toMatchObject({
+        kind: "inventory",
+        action: "consume",
+        quantity: 1,
+      });
+      const after = (await app.inject({ method: "GET", url: invUrl })).json();
+      expect(potionQty(after), JSON.stringify({ quantityBefore, after: potionQty(after) })).toBe(quantityBefore - 1);
+      const text = JSON.stringify(publicTurn(body)) + JSON.stringify(receipt.json()) + JSON.stringify(after);
+      expect(text).not.toMatch(/\bhit points?\b/i);
+    } finally {
+      await app.close();
+    }
   });
 });
