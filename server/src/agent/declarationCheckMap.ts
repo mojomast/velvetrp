@@ -341,6 +341,43 @@ function isMetaTalk(text: string): boolean {
 }
 
 /**
+ * Social check labels whose proposal must not turn a plain question into a roll. Bare Charisma is
+ * the ability label `Charisma (Charisma)`, not a skill.
+ */
+const SOCIAL_CHECK_LABELS: ReadonlySet<string> = new Set([
+  "Persuasion",
+  "Deception",
+  "Intimidation",
+  "Insight",
+  "Performance",
+  "Charisma",
+]);
+
+/** True when a rendered check label names a social skill or the bare Charisma ability. */
+export function isSocialCheckLabel(label: string): boolean {
+  const name = label.split(" (", 1)[0]?.trim() ?? "";
+  return SOCIAL_CHECK_LABELS.has(name);
+}
+
+/** True when the declaration's own words name an explicit social attempt, which still rolls. */
+function declarationAttemptsSocialCheck(declaration: string): boolean {
+  const tokens = declaration.toLocaleLowerCase("en-US").match(/[a-z0-9]+/gu) ?? [];
+  return COMPILED_ENTRIES.some((entry) => SOCIAL_CHECK_LABELS.has(entry.skill) && matchesEntry(tokens, entry) !== null);
+}
+
+/**
+ * True when a planner-proposed check must be refused because the declaration is a plain question or
+ * conversation: the same `isDirectDeclarationAttempt` classification that maps it to no check, and
+ * the declaration does not itself name an explicit social attempt. Non-social checks and explicit
+ * influence attempts are always allowed; when in doubt, allow.
+ */
+export function refuseSocialCheckForDeclaration(declaration: string, checkLabel: string): boolean {
+  if (!isSocialCheckLabel(checkLabel)) return false;
+  if (isDirectDeclarationAttempt(declaration)) return false;
+  return !declarationAttemptsSocialCheck(declaration);
+}
+
+/**
  * Maps a declaration to at most one SRD skill check, or null when no conservative whole-word
  * classification exists. `strong` means a single unmistakable attempt; `weak` means a leaning
  * that must never be committed on its own.
