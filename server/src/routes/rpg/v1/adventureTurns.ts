@@ -864,8 +864,37 @@ const normalizedNarration = (value: string) =>
     .trim();
 const includesAny = (text: string, values: readonly string[]) =>
   values.some((value) => normalizedNarration(text).includes(value));
-const includesNumber = (text: string, value: number) =>
-  new RegExp(`(^|\\D)${String(value).replace("-", "\\-")}(?=\\D|$)`).test(text);
+// Narrators spell small committed quantities out ("fifty feet of hempen rope"). "a"/"an" is
+// deliberately absent: an article never states a quantity of its own.
+const NUMBER_WORDS = new Map<number, string>([
+  [1, "one"],
+  [2, "two"],
+  [3, "three"],
+  [4, "four"],
+  [5, "five"],
+  [6, "six"],
+  [7, "seven"],
+  [8, "eight"],
+  [9, "nine"],
+  [10, "ten"],
+  [11, "eleven"],
+  [12, "twelve"],
+  [13, "thirteen"],
+  [14, "fourteen"],
+  [15, "fifteen"],
+  [16, "sixteen"],
+  [17, "seventeen"],
+  [18, "eighteen"],
+  [19, "nineteen"],
+  [20, "twenty"],
+  [50, "fifty"],
+]);
+const includesNumber = (text: string, value: number) => {
+  if (new RegExp(`(^|\\D)${String(value).replace("-", "\\-")}(?=\\D|$)`).test(text)) return true;
+  const word = NUMBER_WORDS.get(value);
+  if (!word) return false;
+  return new RegExp(`(^|\\D)${word}(?=\\D|$)`).test(normalizedNarration(text));
+};
 const regexEscape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
@@ -929,6 +958,9 @@ const narrationMatchTokens = (value: string): string[] => [
   ),
 ];
 const narrationWords = (text: string): string[] => normalizedNarration(text).split(" ").filter(Boolean);
+// A sheet item label can carry a material or measurement suffix ("Rope, Hempen (50 feet)"). Prose
+// names the core noun, so matching it must not require the qualifiers or the measurement.
+const coreItemLabel = (label: string): string => label.split(/[,()]/, 1)[0]!.trim() || label;
 // Light stemming by shared prefix keeps "success"/"succeeded" and "guard"/"guarding" together
 // without letting short words collide.
 function tokenPrefixMatch(left: string, right: string): boolean {
@@ -1151,6 +1183,25 @@ function assertsTransactionOrAcquisition(normalized: string): boolean {
   return false;
 }
 
+// A sentence may open by naming the scene ("At Slake-Head, the bells ring."), but the name after
+// At/In still claims that place is the present scene. Only an original-case proper name counts:
+// lowercase noun phrases ("At the gallery mouth") remain ordinary scene-setting.
+const NAMED_PLACE_JOINERS = new Set(["of", "the", "de", "des", "du", "la", "le", "les"]);
+const capitalisedNameWord = (word: string): boolean => /^[A-Z][\p{L}\p{N}'’-]*$/u.test(word);
+function namedPlacePrefix(clause: string): string | null {
+  const opening = clause.replace(/^[\s"'“‘]+/, "").match(/^(?:At|In|Inside|Within)\s+(.+)$/);
+  if (!opening) return null;
+  const body = opening[1]!;
+  const terminator = [body.indexOf(","), body.search(/\s[-–—]\s/)].filter((index) => index >= 0);
+  const candidate = body.slice(0, terminator.length ? Math.min(...terminator) : body.length).trim();
+  if (!candidate) return null;
+  const words = candidate.split(/\s+/);
+  if (!words.every((word) => capitalisedNameWord(word) || NAMED_PLACE_JOINERS.has(word))) return null;
+  if (!capitalisedNameWord(words[0]!) || !capitalisedNameWord(words[words.length - 1]!)) return null;
+  if (words[0] === "The" && !(words.length > 1 && capitalisedNameWord(words[1]!))) return null;
+  return candidate;
+}
+
 function acknowledgesCurrentLocation(text: string, currentLocation: string | null): boolean {
   if (!currentLocation) return true;
   // The UI already shows the current location, so prose may omit it. Only a clause that frames a
@@ -1158,22 +1209,58 @@ function acknowledgesCurrentLocation(text: string, currentLocation: string | nul
   const presencePatterns = [
     /\b(?:you are|you stand|you remain)\s+(?:at|in|inside|within)\s+(.+)$/,
     /\b(?:you arrive|you reach|you enter)\s+(?:at|in|inside|within)?\s*(.+)$/,
-    /^(?:at|in|inside|within)\s+(.+)$/,
   ];
-  for (const clause of text.split(/[.!?;:\n]+/).map(normalizedNarration)) {
+  for (const rawClause of text.split(/[.!?;:\n]+/)) {
+    const named = namedPlacePrefix(rawClause);
+    if (named && !mentionsFactPartially(named, currentLocation)) return false;
+    const clause = normalizedNarration(rawClause);
     const place = presencePatterns.map((pattern) => clause.match(pattern)?.[1]).find(Boolean);
     if (place && !mentionsFactPartially(place, currentLocation)) return false;
   }
   return true;
 }
 
+// A check receipt commits an outcome. Provider prose may paraphrase it without naming the skill or
+// using an outcome word, but asserting the opposite outcome is a contradiction. The accepting gate
+// and the diagnostic rule share these lists so they never disagree about a draft.
+const CHECK_SUCCESS_PHRASES = [
+  "success",
+  "succeed",
+  "pays off",
+  "comes through",
+  "does the trick",
+  "prevails",
+  "wins through",
+];
+const CHECK_FAILURE_PHRASES = ["fail", "falls short", "comes to nothing", "comes up short", "misses the mark"];
+const checkStatesOutcome = (text: string, outcome: "success" | "failure"): boolean =>
+  includesAny(text, outcome === "success" ? CHECK_SUCCESS_PHRASES : CHECK_FAILURE_PHRASES);
+/**
+ * The gate tolerates a check narrated as pure fiction, but the turn must still expose the committed
+ * mechanic. When the prose already names the skill and states the outcome nothing is appended;
+ * otherwise the canonical receipt sentence closes the narration. Only that sentence is
+ * server-rendered, so the dispatch source stays provider-assisted.
+ */
+function withCheckReceiptProse(text: string, values: readonly NarrationReceipt[]): string {
+  const appended = values.flatMap((value) => {
+    if (value.kind !== "check") return [];
+    if (mentionsFact(text, value.skill ?? value.ability) && checkStatesOutcome(text, value.outcome)) return [];
+    return [checkReceiptProse(value)];
+  });
+  return appended.length ? `${text} ${appended.join(" ")}` : text;
+}
 /** Conservative semantic gate: receipt prose may add atmosphere, but cannot replace or negate committed public facts. */
 export function providerNarrationMatchesReceipts(
   text: string,
   values: readonly NarrationReceipt[],
   currentLocation: string | null = null,
+  actorState: ActorStateContext | null = null,
 ): boolean {
-  if (!acknowledgesCurrentLocation(text, currentLocation)) return false;
+  // An honest second-person hit-point status restates actor state; it is not a location claim and
+  // not an unsupported vital. Anything that does not match actor state still fails below.
+  const honestVitals = hpStatusMatchesActorState(text, actorState);
+  if (!acknowledgesCurrentLocation(honestVitals ? text.replace(hpStatusPhrasePattern, "") : text, currentLocation))
+    return false;
   const normalized = normalizedNarration(text);
   // A server placeholder or implementation-language reply is not player-visible fiction. When a
   // real scene is established, such a draft must settle on the deterministic fallback instead.
@@ -1235,6 +1322,7 @@ export function providerNarrationMatchesReceipts(
     !hasKind("rest") && (recoveryClaimPattern.test(normalized) || restClaimPattern.test(normalized));
   const unsupportedVitals =
     !hasKind("rest", "combat", "combat-consumable", "combat-power", "power", "mechanic") &&
+    !honestVitals &&
     vitalNumberPattern.test(normalized);
   const unsupportedCurrencyNumbers = !hasKind("commerce", "quest-lifecycle") && currencyNumberPattern.test(normalized);
   const unsupportedLevelNumbers = !hasKind("progression") && levelNumberPattern.test(normalized);
@@ -1299,8 +1387,8 @@ export function providerNarrationMatchesReceipts(
     }
     if (value.kind === "inventory")
       return (
-        mentionsFact(text, value.itemLabel) &&
-        includesNumber(text, value.quantity) &&
+        mentionsFact(text, coreItemLabel(value.itemLabel)) &&
+        (value.quantity === 1 || includesNumber(text, value.quantity)) &&
         includesAny(
           text,
           value.action === "equip"
@@ -1341,7 +1429,7 @@ export function providerNarrationMatchesReceipts(
         includesAny(
           text,
           value.action === "accept"
-            ? ["accept", "accepted"]
+            ? ["accept", "accepted", "take", "took", "taken", "yours", "agree", "sign", "job"]
             : value.action === "abandon"
               ? ["abandon", "abandoned"]
               : ["claim", "claimed"],
@@ -1354,13 +1442,12 @@ export function providerNarrationMatchesReceipts(
         includesAny(text, ["advance", "advances", "advanced", "level"])
       );
     if (value.kind === "check") {
-      // The sheet already shows the total and DC, so the prose only has to name the check and
-      // narrate the committed result faithfully. A paraphrase of success or failure is enough,
-      // but the opposite outcome is still a contradiction.
-      if (!mentionsFact(text, value.skill ?? value.ability)) return false;
-      const succeeded = includesAny(text, ["success", "succeed", "pays off", "comes through", "does the trick"]);
-      const failed = includesAny(text, ["fail", "falls short", "comes to nothing"]);
-      return value.outcome === "success" ? succeeded && !failed : failed && !succeeded;
+      // The sheet already shows the total and DC, so prose may narrate the committed result without
+      // naming the skill or using an outcome word. Only the opposite outcome is a contradiction:
+      // a success may not read as a failure, and a failure may not read as a success.
+      const succeeded = includesAny(text, CHECK_SUCCESS_PHRASES);
+      const failed = includesAny(text, CHECK_FAILURE_PHRASES);
+      return value.outcome === "success" ? succeeded || !failed : failed || !succeeded;
     }
     if (value.kind === "power")
       return (
@@ -1514,7 +1601,7 @@ export function narrationGateFailure(
   )
     return "unsupported-transaction";
   if (values.length === 0) return null;
-  return providerNarrationMatchesReceipts(text, values, currentLocation) ? null : "grounding-mismatch";
+  return providerNarrationMatchesReceipts(text, values, currentLocation, actorState) ? null : "grounding-mismatch";
 }
 type NarrationUsage = { promptTokens: number; completionTokens: number; totalTokens: number };
 function narrationUsageTotal(results: readonly ProviderCompletionResult[]): NarrationUsage | null {
@@ -2050,13 +2137,13 @@ async function performNarration(
         ? conversationNarrationMatches(text, publicContext.currentLocation)
           ? null
           : (narrationGateFailure(text, [], null) ?? "conversation-gate")
-        : narrationGateFailure(text, safeReceipts, publicContext.currentLocation);
+        : narrationGateFailure(text, safeReceipts, publicContext.currentLocation, actorState);
     };
     const gateAgainst = (text: string): boolean =>
       !deniesActiveCombatEnemy(text, actorState) &&
       (conversation
         ? conversationNarrationMatches(text, publicContext.currentLocation)
-        : providerNarrationMatchesReceipts(text, safeReceipts, publicContext.currentLocation));
+        : providerNarrationMatchesReceipts(text, safeReceipts, publicContext.currentLocation, actorState));
     let result = await completeNarrationDispatch(dispatch, completionInput, consumed);
     let providerText = narrationTextFromResult(result);
     // One bounded repair only. A syntactically valid narration that fails the local grounding gate
@@ -2101,6 +2188,7 @@ async function performNarration(
       debugOutcome = "provider-accepted";
     }
     providerText = withWoundStatusHealth(providerText, turn.declaration, actorState.health);
+    providerText = withCheckReceiptProse(providerText, safeReceipts);
     const currentSnapshot = repo.getCampaignAgentContextSnapshot(principalId, turn.campaignId, turn.sessionId, {
       kind: "player",
       actorId: turn.actorId,
