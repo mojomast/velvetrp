@@ -29,9 +29,31 @@ type ReadRow = RpgDefinitionRow & {
   visibility_rows_json: string;
 };
 
+const VISIBLE_DEFINITIONS_CACHE_LIMIT = 64;
+
 export function createCampaignContentDefinitionReadRepository(db: DatabaseDriver.Database, projectors: Projectors) {
-  const visibleDefinitions = (row: ReadRow, packId: string, packVersion: string): Set<string> =>
-    new Set(
+  // Sealed packs are immutable, so a verified projection can be reused for every
+  // lookup. The key carries the attestation digests, ensuring a changed or
+  // re-sealed pack can never observe a stale entry. Failed verifications are
+  // never cached: the throw propagates and the next call verifies again.
+  const visibleDefinitionsCache = new Map<string, ReadonlySet<string>>();
+  const visibleDefinitions = (row: ReadRow, packId: string, packVersion: string): ReadonlySet<string> => {
+    const key = JSON.stringify([
+      packId,
+      packVersion,
+      row.definition_count,
+      row.legacy_manifest_digest,
+      row.publication_digest,
+      row.public_projection_digest,
+    ]);
+    const cached = visibleDefinitionsCache.get(key);
+    if (cached) {
+      // Refresh recency so the bound evicts the least recently used pack.
+      visibleDefinitionsCache.delete(key);
+      visibleDefinitionsCache.set(key, cached);
+      return cached;
+    }
+    const visible = new Set(
       projectors
         .verifyCatalogVisibilityProjection({
           packId,
@@ -47,6 +69,13 @@ export function createCampaignContentDefinitionReadRepository(db: DatabaseDriver
           return `${reference.kind === "enemy-template" ? "enemy" : reference.kind}\0${reference.definitionId}`;
         }),
     );
+    visibleDefinitionsCache.set(key, visible);
+    if (visibleDefinitionsCache.size > VISIBLE_DEFINITIONS_CACHE_LIMIT) {
+      const oldest = visibleDefinitionsCache.keys().next().value;
+      if (oldest !== undefined) visibleDefinitionsCache.delete(oldest);
+    }
+    return visible;
+  };
   const select = (
     where: string,
     order = "",
@@ -92,7 +121,7 @@ export function createCampaignContentDefinitionReadRepository(db: DatabaseDriver
       if (!rows.length) return [];
       const authority = rows[0]!;
       if (authority.validation_level !== "validated-v1") return rows.map(projectors.toRpgDefinition);
-      let visible: Set<string>;
+      let visible: ReadonlySet<string>;
       try {
         visible = visibleDefinitions(authority, normalized.packId, normalized.packVersion);
       } catch (error) {
@@ -127,7 +156,7 @@ export function createCampaignContentDefinitionReadRepository(db: DatabaseDriver
         ) as ReadRow | undefined;
       if (!row) return null;
       if (row.validation_level === "validated-v1") {
-        let visible: Set<string>;
+        let visible: ReadonlySet<string>;
         try {
           visible = visibleDefinitions(row, normalized.packId, normalized.packVersion);
         } catch (error) {
