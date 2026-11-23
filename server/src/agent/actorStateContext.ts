@@ -136,10 +136,21 @@ export function buildActorStateContext(input: {
 
   const inventorySnapshot = attempt(() => repo.getActorInventorySnapshot(principal, campaignId, actorId));
   const equipped = new Set((inventorySnapshot?.equipment ?? []).map((entry) => entry.entryId));
+  // Repeated inventory entries commonly share one definition; resolve each
+  // distinct definition once per snapshot without changing the output.
+  const definitions = new Map<string, { name: string }>();
   const inventoryEntries = inventorySnapshot
     ? inventorySnapshot.inventory.items.flatMap((item) => {
-        const definition = attempt(() => repo.getCampaignContentPackDefinition(principal, campaignId, item.item));
-        if (!definition?.name) return [];
+        const reference = item.item;
+        const key = `${reference.packId}\0${reference.packVersion}\0${reference.kind}\0${reference.definitionId}`;
+        let definition = definitions.get(key);
+        if (!definition) {
+          const resolved = attempt(() => repo.getCampaignContentPackDefinition(principal, campaignId, reference));
+          if (!resolved) return [];
+          definition = resolved;
+          definitions.set(key, resolved);
+        }
+        if (!definition.name) return [];
         return [
           {
             text: definition.name,
