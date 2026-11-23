@@ -1183,6 +1183,25 @@ function assertsTransactionOrAcquisition(normalized: string): boolean {
   return false;
 }
 
+// A sentence may open by naming the scene ("At Slake-Head, the bells ring."), but the name after
+// At/In still claims that place is the present scene. Only an original-case proper name counts:
+// lowercase noun phrases ("At the gallery mouth") remain ordinary scene-setting.
+const NAMED_PLACE_JOINERS = new Set(["of", "the", "de", "des", "du", "la", "le", "les"]);
+const capitalisedNameWord = (word: string): boolean => /^[A-Z][\p{L}\p{N}'’-]*$/u.test(word);
+function namedPlacePrefix(clause: string): string | null {
+  const opening = clause.replace(/^[\s"'“‘]+/, "").match(/^(?:At|In|Inside|Within)\s+(.+)$/);
+  if (!opening) return null;
+  const body = opening[1]!;
+  const terminator = [body.indexOf(","), body.search(/\s[-–—]\s/)].filter((index) => index >= 0);
+  const candidate = body.slice(0, terminator.length ? Math.min(...terminator) : body.length).trim();
+  if (!candidate) return null;
+  const words = candidate.split(/\s+/);
+  if (!words.every((word) => capitalisedNameWord(word) || NAMED_PLACE_JOINERS.has(word))) return null;
+  if (!capitalisedNameWord(words[0]!) || !capitalisedNameWord(words[words.length - 1]!)) return null;
+  if (words[0] === "The" && !(words.length > 1 && capitalisedNameWord(words[1]!))) return null;
+  return candidate;
+}
+
 function acknowledgesCurrentLocation(text: string, currentLocation: string | null): boolean {
   if (!currentLocation) return true;
   // The UI already shows the current location, so prose may omit it. Only a clause that frames a
@@ -1191,7 +1210,10 @@ function acknowledgesCurrentLocation(text: string, currentLocation: string | nul
     /\b(?:you are|you stand|you remain)\s+(?:at|in|inside|within)\s+(.+)$/,
     /\b(?:you arrive|you reach|you enter)\s+(?:at|in|inside|within)?\s*(.+)$/,
   ];
-  for (const clause of text.split(/[.!?;:\n]+/).map(normalizedNarration)) {
+  for (const rawClause of text.split(/[.!?;:\n]+/)) {
+    const named = namedPlacePrefix(rawClause);
+    if (named && !mentionsFactPartially(named, currentLocation)) return false;
+    const clause = normalizedNarration(rawClause);
     const place = presencePatterns.map((pattern) => clause.match(pattern)?.[1]).find(Boolean);
     if (place && !mentionsFactPartially(place, currentLocation)) return false;
   }
