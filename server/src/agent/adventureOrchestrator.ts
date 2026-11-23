@@ -76,7 +76,11 @@ import {
 } from "./toolRegistry.js";
 import { adventurePlanningMessages } from "./adventurePrompt.js";
 import { candidateLabels, labeled, type LabeledCandidate } from "./providerCandidateProjection.js";
-import { declarationCheckCandidateLabel, mapDeclarationToCheck } from "./declarationCheckMap.js";
+import {
+  declarationCheckCandidateLabel,
+  mapDeclarationToCheck,
+  refuseSocialCheckForDeclaration,
+} from "./declarationCheckMap.js";
 import { isDirectDeclarationAttempt, isRoutineObservationDeclaration } from "./declarationAttempt.js";
 import { adventureTurnBudgets, type TurnBudgetPolicy } from "./turnBudget.js";
 import { DIRECT_TOOL_BODY_OVERRIDES } from "./directToolReasoning.js";
@@ -1046,6 +1050,20 @@ export function relevantCheckCandidates<T extends { label: string }>(
   const preferred = candidates.find((candidate) => candidate.label === declarationCheckCandidateLabel(mapping));
   if (!preferred || relevant[0] === preferred) return relevant;
   return [preferred, ...relevant.filter((candidate) => candidate !== preferred)];
+}
+
+/**
+ * A planner-selected social check is refused when the declaration is the plain question or
+ * conversation that already maps to no check, unless the declaration names an explicit attempt.
+ * The label is looked up from the exact advertised candidate, so non-social checks stay untouched.
+ */
+function refusedConversationSocialCheck(
+  declaration: string,
+  candidates: readonly LabeledCandidate<{ candidateId: string; digest: string }>[],
+  candidateId: unknown,
+): boolean {
+  const label = candidates.find((candidate) => candidate.candidateId === candidateId)?.semanticLabel.source;
+  return label ? refuseSocialCheckForDeclaration(declaration, label) : false;
 }
 
 export const effectiveAdventureTurnMaxTokens = (provider: ProviderSettings) => provider.samplers.maxTokens ?? 4_096;
@@ -3365,6 +3383,7 @@ export async function orchestrateAdventureTurn(
     let measuredUsage: ProviderCompletionResult["usage"] = null;
     let usageEstimated = false;
     let batch: ReturnType<typeof validateBatch>;
+    let refusedSocialCheck = false;
     const completionLimit = effectiveAdventureTurnMaxTokens(provider);
     const completionInput: ProviderCompletionInput = {
       provider: { ...provider, samplers: { ...provider.samplers, maxTokens: completionLimit } },
@@ -3463,6 +3482,16 @@ export async function orchestrateAdventureTurn(
       usageEstimated = charged.source === "estimated";
       throwIfAborted(signal);
       batch = validateBatch(result, selected, priorIds);
+      if (
+        batch.calls.length === 1 &&
+        batch.calls[0]!.toolName === "exact_srd_check.select" &&
+        refusedConversationSocialCheck(turn.declaration, providerChecks, batch.calls[0]!.arguments.candidateId)
+      ) {
+        // Refuse a social check proposed for a plain question: settle this round as the provider's
+        // deliberate no-action hold so the turn continues down the conversation narration lane.
+        refusedSocialCheck = true;
+        batch = { result: "complete", calls: [] };
+      }
       if (dependencies.now().toISOString() >= planning.deadlineAt)
         throw new Error("provider response arrived after execution deadline");
       const addedMutations = batch.calls.filter((call) => call.kind === "mutation").length;
@@ -3787,6 +3816,17 @@ export async function orchestrateAdventureTurn(
       expectedExecutionRevision: afterOutcome.executionRevision,
       idempotencyKey: key("agent-decision", turn.turnId, String(round)),
     });
+
+    if (refusedSocialCheck) {
+      // The proposal was refused above: no check receipt, no hold object, and no follow-on
+      // mechanics. The turn is an ordinary no-action conversation turn and keeps provider prose.
+      safeEnemyFallback(repository, snapshot, turn.turnId);
+      return {
+        turn: privateTurn(repository, turn.turnId),
+        outcome: "completed",
+        limitations: ADVENTURE_TOOL_LIMITATIONS,
+      };
+    }
 
     if (batch.result === "complete") {
       // A "complete" result with no tool calls is the provider's only deliberate hold protocol, and
