@@ -34,6 +34,19 @@ describe("sentences that start with At/In are not location claims", () => {
     expect(gate("You remain inside the Draughtwarden Hall.")).toBe(false);
   });
 
+  it("still rejects a sentence that opens by framing a different NAMED place as the scene", () => {
+    // Regression guard from rpg-adventure-turn-route "post-travel visible location": a stale room name used as
+    // the scene-setting prefix must stay rejected even though bare lowercase "At the ..." is now fine.
+    expect(gate("At Place La Salle, the ferryman answers your question.")).toBe(false);
+    expect(gate("At The Long Reflectory, the clerks stare at you.")).toBe(false);
+    expect(gate("In Parc des Pionniers, the ferryman answers your question.")).toBe(false);
+    expect(gate("At Place La Salle, Survey the Park advances to 1 of 1 as you complete the park survey.")).toBe(false);
+  });
+
+  it("accepts a proper-name prefix when it names the current location", () => {
+    expect(gate("At Slake-Head, the bells ring out across the carts.")).toBe(true);
+  });
+
   it("still accepts the current location named in a presence clause", () => {
     expect(gate("You stand in Slake-Head, the bells still ringing.")).toBe(true);
   });
