@@ -1807,9 +1807,7 @@ describe("bounded adventure orchestrator", () => {
     const result = await orchestrateAdventureTurn(
       repository,
       created.turnId,
-      dependencies([
-        completion([{ id: "roll-1", name: "actor_dice.roll", arguments: '{"expression":"1d20"}' }]),
-      ]),
+      dependencies([completion([{ id: "roll-1", name: "actor_dice.roll", arguments: '{"expression":"1d20"}' }])]),
     );
     expect(result.outcome).toBe("mechanics-committed");
     expect(result.turn.toolCalls).toHaveLength(1);
