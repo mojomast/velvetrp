@@ -42,6 +42,7 @@ import {
   type SystemOneCaller,
 } from "../provider/index.js";
 import { canUseSystemOne } from "../provider/providerTransport.js";
+import { ProviderProtocolError } from "../provider/openAiCompatibleCompletion.js";
 import { readRpgFeatureFlags } from "../features.js";
 import { systemOneAdventurePayload, systemOneLaneMode } from "../defaults.js";
 import type { CampaignRecallHit } from "../repo/campaign/campaignRecallReadRepo.js";
@@ -1020,6 +1021,16 @@ function providerLabel(provider: ProviderSettings): string {
   return provider.providerType || "openai-compatible";
 }
 function outcomeCode(error: unknown): string {
+  if (error instanceof ProviderProtocolError) {
+    const slug = error.message
+      .toLowerCase()
+      .replace(/\d+/g, "n")
+      .replace(/[^a-z]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80)
+      .replace(/-+$/g, "");
+    return slug ? `ProviderProtocolError.${slug}` : "ProviderProtocolError";
+  }
   const name = error instanceof Error ? error.name : "UnknownError";
   return resourceIdSchema.safeParse(name).success ? name : "provider-failure";
 }
