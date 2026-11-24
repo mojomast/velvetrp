@@ -32,6 +32,7 @@ import {
 } from "../repo/campaignGenerationReferences.js";
 import { getRepositoryDatabase } from "../repo/repoContext.js";
 import { createSintermarkParty } from "./sintermarkParty.js";
+import type { QuickAdventurePartySpec } from "./quickAdventureCatalog.js";
 import recipeJson from "./recipes/sintermark-world.json" with { type: "json" };
 
 const REPORT_FILE = "sintermark-report.json";
@@ -284,8 +285,8 @@ function referenceIdentity(reference: {
 // Recipe loading and normalization
 // ---------------------------------------------------------------------------
 
-export function readSintermarkRecipe(): SintermarkRecipe {
-  const parsed: unknown = recipeJson;
+export function readSintermarkRecipe(source?: unknown): SintermarkRecipe {
+  const parsed: unknown = source ?? recipeJson;
   if (!isRecord(parsed)) fail("Sintermark recipe must be a JSON object");
   const name = asText(parsed.name) ?? fail("recipe.name is required");
   if (!isRecord(parsed.content)) fail("recipe.content must be an object with generated sections");
@@ -1208,6 +1209,8 @@ export interface RunSintermarkBuildInput {
   campaignId: string;
   keyPrefix: string;
   recipe?: SintermarkRecipe;
+  party?: QuickAdventurePartySpec;
+  openingLine?: string;
 }
 
 /** Builds the reviewed world into an existing, freshly created campaign. */
@@ -1224,7 +1227,9 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
     });
   });
 
-  const heroes = await buildStep("party", () => createSintermarkParty(repository, ownerId, campaignId, keyPrefix));
+  const heroes = await buildStep("party", () =>
+    createSintermarkParty(repository, ownerId, campaignId, keyPrefix, input.party),
+  );
 
   const sessionId = await buildStep("room", async () => {
     const session = await createSession({
@@ -1234,13 +1239,13 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
       presetId: "default",
     });
     await yieldToEventLoop();
-    repository.transitionSession(session.id, "active", "Sintermark campaign opened");
+    repository.transitionSession(session.id, "active", `${recipe.name} campaign opened`);
     await yieldToEventLoop();
     repository.addConsentEvent(
       session.id,
       "campaign-safety",
       true,
-      "Fictional adults. Follow the reviewed Sintermark safety policy and boundaries.",
+      `Fictional adults. Follow the reviewed ${recipe.name} safety policy and boundaries.`,
     );
     await yieldToEventLoop();
     repository.updateSessionContextSource(session.id, recipe.premise ?? `The opening of ${recipe.name}.`);
@@ -1250,7 +1255,8 @@ export async function runSintermarkBuildIntoCampaign(input: RunSintermarkBuildIn
     await addMessage(
       session.id,
       "character",
-      "Those readings disagree. Orra, keep the street clear while I compare the raw log with the gauge.",
+      input.openingLine ??
+        "Those readings disagree. Orra, keep the street clear while I compare the raw log with the gauge.",
       { speakerCharacterId: heroes[0]!.personaId },
     );
     await yieldToEventLoop();

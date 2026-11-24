@@ -33,7 +33,7 @@ describe("quick adventure catalog", () => {
     const adventures = listQuickAdventures();
     expect(adventures.map((adventure) => adventure.id)).toEqual(["sintermark", "hermes-nous"]);
     expect(adventures[0]!.name).toBe(QUICK_ADVENTURE_CAMPAIGN_NAME);
-    expect(adventures[0]!.heroes).toEqual(["Tessel", "Orra"]);
+    expect(adventures[0]!.heroes).toEqual(["Tessel Venn", "Orra Staple"]);
     expect(adventures[1]!.name).toBe(HERMES_NAME);
     expect(adventures[1]!.heroes).toEqual(HERMES_HEROES);
   });
@@ -92,7 +92,7 @@ describe("createQuickAdventure with an adventure id", () => {
       const explicit = await createQuickAdventure({ repository, ownerId: OWNER, adventureId: "sintermark" });
       for (const result of [implicit, explicit]) {
         expect(result.campaignName).toBe(QUICK_ADVENTURE_CAMPAIGN_NAME);
-        expect(result.heroes.map((hero) => hero.name)).toEqual(["Tessel", "Orra"]);
+        expect(result.heroes.map((hero) => hero.name)).toEqual(["Tessel Venn", "Orra Staple"]);
         expect(
           count(
             "SELECT count(*) n FROM campaign_locations_v28 WHERE campaign_id=? AND visibility='public'",
