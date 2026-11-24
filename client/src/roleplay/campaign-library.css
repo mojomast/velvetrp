@@ -28,6 +28,13 @@
 .world-library .world-library-start button {
   flex-shrink: 0;
 }
+.world-library .world-library-start select {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 22rem;
+  margin-block: 0.5rem;
+}
 .world-library .world-library-blank {
   margin-block: 1rem;
   padding: 1rem;

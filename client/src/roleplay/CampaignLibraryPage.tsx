@@ -7,7 +7,7 @@ import {
   listCampaigns,
   type CampaignAccess,
 } from "../api";
-import type { CampaignLifecycleStatus } from "@velvet/contracts";
+import { QUICK_ADVENTURE_OPTIONS, type CampaignLifecycleStatus, type QuickAdventureId } from "@velvet/contracts";
 import { WorldbuildingAgentPanel } from "../components/rpg/campaign/WorldbuildingAgentPanel";
 import "./campaign-library.css";
 
@@ -52,8 +52,10 @@ export function CampaignLibraryPage({
   const [generatorOpened, setGeneratorOpened] = useState(false);
   const [quickBuilding, setQuickBuilding] = useState(false);
   const [quickError, setQuickError] = useState<string | null>(null);
+  const [quickAdventureId, setQuickAdventureId] = useState<QuickAdventureId>("sintermark");
   const quickBuildingRef = useRef(false);
   const quickKeyRef = useRef<string | null>(null);
+  const quickKeyAdventureRef = useRef<QuickAdventureId | null>(null);
   const generatorHeadingRef = useRef<HTMLHeadingElement>(null);
   const [statuses, setStatuses] = useState<Record<string, CampaignLifecycleStatus | "unavailable">>({});
   const [focusCampaignId, setFocusCampaignId] = useState<string | null>(null);
@@ -183,11 +185,16 @@ export function CampaignLibraryPage({
     quickBuildingRef.current = true;
     setQuickBuilding(true);
     setQuickError(null);
-    const idempotencyKey = quickKeyRef.current ?? `quick-${crypto.randomUUID()}`;
+    const idempotencyKey =
+      quickKeyRef.current !== null && quickKeyAdventureRef.current === quickAdventureId
+        ? quickKeyRef.current
+        : `quick-${crypto.randomUUID()}`;
     quickKeyRef.current = idempotencyKey;
+    quickKeyAdventureRef.current = quickAdventureId;
     try {
-      const result = await createQuickAdventure({ idempotencyKey });
+      const result = await createQuickAdventure({ idempotencyKey, adventureId: quickAdventureId });
       quickKeyRef.current = null;
+      quickKeyAdventureRef.current = null;
       if (!mountedRef.current) return;
       setQuickError(null);
       if (onOpen) onOpen(result.campaignId, "play");
@@ -258,6 +265,18 @@ export function CampaignLibraryPage({
           </button>
           <div>
             <p className="meta-text">Or jump straight in with a ready-made starter world, built in seconds.</p>
+            <select
+              aria-label="Quick adventure world"
+              value={quickAdventureId}
+              disabled={quickBuilding}
+              onChange={(event) => setQuickAdventureId(event.target.value as QuickAdventureId)}
+            >
+              {QUICK_ADVENTURE_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+            </select>
             <button
               className="ghost"
               aria-label="Start a quick adventure"

@@ -1,16 +1,22 @@
 import { parentPort, workerData } from "node:worker_threads";
 import { createRepository } from "../repo/index.js";
 import { QuickAdventureError, createQuickAdventure } from "./quickAdventure.js";
+import type { QuickAdventureId } from "./quickAdventureCatalog.js";
 
 interface QuickAdventureWorkerData {
   databaseDir: string;
   ownerId: string;
+  adventureId?: QuickAdventureId;
 }
 
-const { databaseDir, ownerId } = workerData as QuickAdventureWorkerData;
+const { databaseDir, ownerId, adventureId } = workerData as QuickAdventureWorkerData;
 const repository = createRepository({ dataDir: databaseDir });
 try {
-  const result = await createQuickAdventure({ repository, ownerId });
+  const result = await createQuickAdventure({
+    repository,
+    ownerId,
+    ...(adventureId ? { adventureId } : {}),
+  });
   parentPort?.postMessage({ ok: true, result });
 } catch (error) {
   if (error instanceof QuickAdventureError) {

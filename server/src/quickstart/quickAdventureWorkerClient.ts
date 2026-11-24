@@ -2,10 +2,12 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 import { QuickAdventureError, type QuickAdventureResult } from "./quickAdventure.js";
+import type { QuickAdventureId } from "./quickAdventureCatalog.js";
 
 interface QuickAdventureWorkerInput {
   databaseDir: string;
   ownerId: string;
+  adventureId?: QuickAdventureId;
 }
 
 type QuickAdventureWorkerMessage =
@@ -30,11 +32,12 @@ function resolveWorkerEntry(): { entry: URL; execArgv: string[] } {
 export function runQuickAdventureInWorker({
   databaseDir,
   ownerId,
+  adventureId,
 }: QuickAdventureWorkerInput): Promise<QuickAdventureResult> {
   return new Promise<QuickAdventureResult>((resolve, reject) => {
     const { entry, execArgv } = resolveWorkerEntry();
     const worker = new Worker(entry, {
-      workerData: { databaseDir, ownerId },
+      workerData: { databaseDir, ownerId, ...(adventureId ? { adventureId } : {}) },
       execArgv,
     });
     let settled = false;

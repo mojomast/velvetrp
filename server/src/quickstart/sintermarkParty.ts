@@ -44,6 +44,7 @@ import {
   type ProgressionSelection,
   type UpdateCharacterDraftInput,
 } from "@velvet/contracts";
+import type { QuickAdventurePartySpec } from "./quickAdventureCatalog.js";
 import { SRD_5_1_STARTER_CATALOG, type Repository } from "../repo/index.js";
 import { getRepositoryDatabase } from "../repo/repoContext.js";
 
@@ -107,15 +108,17 @@ interface StackableItemPlan {
   quantity: number;
 }
 
-interface HeroSpec {
-  key: "tessel" | "orra";
+export interface HeroSpec {
+  key: string;
   name: string;
   age: number;
   archetype: string;
   ancestryDefinitionId: string;
   classDefinitionId: string;
+  subclassDefinitionId: string;
   primaryAttribute: SrdAttributeId;
   preparedSpells: readonly string[];
+  knownCantrips: readonly string[];
   targetScores: Readonly<Record<SrdAttributeId, number>>;
   battlePowers: readonly string[];
   componentNotes: string;
@@ -125,7 +128,7 @@ interface HeroSpec {
   attunementItems: readonly string[];
 }
 
-const HEROES: readonly HeroSpec[] = [
+export const SINTERMARK_HEROES: readonly HeroSpec[] = [
   {
     key: "tessel",
     name: "Tessel Venn",
@@ -133,9 +136,11 @@ const HEROES: readonly HeroSpec[] = [
     archetype: "High-elven thermal surveyor and whistleblower",
     ancestryDefinitionId: "srd-5.1:race:high-elf",
     classDefinitionId: "srd-5.1:class:wizard",
+    subclassDefinitionId: "srd-5.1:subclass:school-of-evocation",
     primaryAttribute: "intelligence",
     // Exact level-one prepared spells offered by the Wizard class definition.
     preparedSpells: ["srd-5.1:spell:magic-missile", "srd-5.1:spell:false-life", "srd-5.1:spell:shield"],
+    knownCantrips: ["srd-5.1:spell:fire-bolt", "srd-5.1:spell:ray-of-frost"],
     targetScores: { intelligence: 20, dexterity: 20, constitution: 20, wisdom: 18, strength: 16, charisma: 18 },
     battlePowers: [
       "srd-5.1:spell:fire-bolt",
@@ -189,9 +194,11 @@ const HEROES: readonly HeroSpec[] = [
     archetype: "Hill-dwarf Life-domain cleric and union rescue forewoman",
     ancestryDefinitionId: "srd-5.1:race:hill-dwarf",
     classDefinitionId: "srd-5.1:class:cleric",
+    subclassDefinitionId: "srd-5.1:subclass:life-domain",
     primaryAttribute: "wisdom",
     // Exact level-one prepared spells offered by the Cleric class definition.
     preparedSpells: ["srd-5.1:spell:bless", "srd-5.1:spell:cure-wounds", "srd-5.1:spell:healing-word"],
+    knownCantrips: [],
     targetScores: { strength: 20, wisdom: 20, constitution: 20, dexterity: 18, intelligence: 18, charisma: 18 },
     battlePowers: ["srd-5.1:spell:bless", "srd-5.1:spell:cure-wounds", "srd-5.1:spell:healing-word"],
     componentNotes:
@@ -327,12 +334,17 @@ function findExisting(repository: Repository, ownerId: string, campaignId: strin
   };
 }
 
-function createPersona(repository: Repository, ownerId: string, hero: HeroSpec): string {
+function createPersona(
+  repository: Repository,
+  ownerId: string,
+  hero: HeroSpec,
+  profile: QuickAdventurePartySpec["profiles"][string],
+): string {
   const persona = repository.createCharacter({
     name: hero.name,
     age: hero.age,
     archetype: hero.archetype,
-    profile: SINTERMARK_HERO_PROFILES[hero.key],
+    profile,
     boundaries: "Fictional adults. No sexual violence, harm to children, or demeaning portrayals of real communities.",
     fictionalConfirmed: true,
   });
@@ -417,6 +429,9 @@ function setActorAttribute(
   attributeId: SrdAttributeId,
   value: number,
 ): void {
+  const character = repository.getCampaignCharacterByActorId(ownerId, campaignId, actorId);
+  const current = character?.projection.sheet.attributes.find((entry) => entry.attributeId === attributeId)?.value;
+  if (current === value) return;
   const timeline = activeTimeline(repository, ownerId, campaignId);
   const commandId = `${keyPrefix}.attr.${key}.${attributeId}`;
   const envelope: CommandEnvelope = {
@@ -639,15 +654,15 @@ export const SINTERMARK_PARTY_GUIDE = Object.freeze({
     "Stackable grants use materializeStackableEntry: owned campaign + public pin + stackable definition checked before insert.",
     "Magic items are carried reference metadata only; charges, granted powers, and passive modifiers do not execute and magic items are never equipped.",
   ],
-  heroes: HEROES.map((hero) => ({
+  heroes: SINTERMARK_HEROES.map((hero) => ({
     key: hero.key,
     name: hero.name,
     concept: hero.archetype,
     ancestry: hero.ancestryDefinitionId,
     class: hero.classDefinitionId,
-    subclass: hero.key === "tessel" ? "srd-5.1:subclass:school-of-evocation" : "srd-5.1:subclass:life-domain",
+    subclass: hero.subclassDefinitionId,
     preparedSpells: [...hero.preparedSpells],
-    knownCantrips: hero.key === "tessel" ? ["srd-5.1:spell:fire-bolt", "srd-5.1:spell:ray-of-frost"] : [],
+    knownCantrips: [...hero.knownCantrips],
     supportedBattlePowers: [...hero.battlePowers],
     componentNotes: hero.componentNotes,
     reactionConstraints: hero.reactionConstraints,
@@ -671,10 +686,16 @@ export async function createSintermarkParty(
   ownerId: string,
   campaignId: string,
   keyPrefix: string,
+  partySpec?: QuickAdventurePartySpec,
 ): Promise<Array<{ personaId: string; actorId: string; campaignCharacterId: string; name: string }>> {
+  const activeParty: QuickAdventurePartySpec = partySpec ?? {
+    heroes: SINTERMARK_HEROES,
+    profiles: SINTERMARK_HERO_PROFILES,
+  };
+  const { heroes: partyHeroes, profiles } = activeParty;
   const party: Array<{ personaId: string; actorId: string; campaignCharacterId: string; name: string }> = [];
 
-  for (const hero of HEROES) {
+  for (const hero of partyHeroes) {
     await yieldToEventLoop();
     const existing = findExisting(repository, ownerId, campaignId, hero.name);
     if (existing) {
@@ -682,7 +703,9 @@ export async function createSintermarkParty(
       continue;
     }
 
-    const personaId = createPersona(repository, ownerId, hero);
+    const profile = profiles[hero.key];
+    if (!profile) throw new Error(`Sintermark: no persona profile for ${hero.key}`);
+    const personaId = createPersona(repository, ownerId, hero, profile);
 
     await yieldToEventLoop();
     const draft = repository.createCharacterDraft(ownerId, campaignId, {
@@ -720,7 +743,7 @@ export async function createSintermarkParty(
 
   // GM overlay after leveling: absolute targets, so ancestry is never double-applied.
   // Deterministic command keys make this loop idempotent across re-runs.
-  for (const hero of HEROES) {
+  for (const hero of partyHeroes) {
     await yieldToEventLoop();
     const entry = party.find((candidate) => candidate.name === hero.name)!;
     for (const attributeId of SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS) {
@@ -739,7 +762,7 @@ export async function createSintermarkParty(
   }
 
   // Inventory authoring through scoped repository-database transactions.
-  for (const hero of HEROES) {
+  for (const hero of partyHeroes) {
     await yieldToEventLoop();
     const entry = party.find((candidate) => candidate.name === hero.name)!;
 
@@ -772,7 +795,7 @@ export async function createSintermarkParty(
   }
 
   // Equip only real-profile equipment through the public inventory command.
-  for (const hero of HEROES) {
+  for (const hero of partyHeroes) {
     await yieldToEventLoop();
     const entry = party.find((candidate) => candidate.name === hero.name)!;
     for (const item of hero.instancedItems) {
@@ -787,6 +810,7 @@ export async function createSintermarkParty(
     }
   }
 
-  if (party.length !== HEROES.length) throw new Error("Sintermark: party did not materialize both heroes");
+  if (party.length !== partyHeroes.length)
+    throw new Error(`Sintermark: party did not materialize ${partyHeroes.length} heroes`);
   return party;
 }

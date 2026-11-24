@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Repository } from "../repo/index.js";
+import { getQuickAdventure, type QuickAdventureDefinition, type QuickAdventureId } from "./quickAdventureCatalog.js";
 import {
   SINTERMARK_RECIPE_NAME,
   SintermarkBuildStepError,
@@ -30,12 +31,18 @@ function keyPrefixForCampaign(campaignId: string): string {
   return `quick.${createHash("sha256").update(campaignId).digest("hex")}`;
 }
 
-function archiveFailedCampaign(repository: Repository, ownerId: string, campaignId: string, keyPrefix: string): void {
+function archiveFailedCampaign(
+  repository: Repository,
+  ownerId: string,
+  campaignId: string,
+  keyPrefix: string,
+  confirmationName: string,
+): void {
   try {
     const administration = repository.getCampaignAdministration(ownerId, campaignId);
     if (!administration || administration.status === "archived") return;
     repository.archiveCampaignWithConfirmation(ownerId, campaignId, {
-      confirmationName: QUICK_ADVENTURE_CAMPAIGN_NAME,
+      confirmationName,
       expectedRevision: administration.revision,
       idempotencyKey: `${keyPrefix}.archive`,
     });
@@ -53,22 +60,33 @@ export interface QuickAdventureResult {
 }
 
 /**
- * Builds the reviewed Sintermark world into the owner's database as a new
- * campaign. It never reuses an existing campaign and never contacts a model
+ * Builds the selected reviewed quick adventure world into the owner's database
+ * as a new campaign. It never reuses an existing campaign and never contacts a model
  * provider; on failure the partial campaign is archived before the step-named
  * error is returned.
  */
 export async function createQuickAdventure({
   repository,
   ownerId,
+  adventureId = "sintermark",
 }: {
   repository: Repository;
   ownerId: string;
+  adventureId?: QuickAdventureId;
 }): Promise<QuickAdventureResult> {
+  let definition: QuickAdventureDefinition;
+  try {
+    definition = getQuickAdventure(adventureId);
+  } catch (error) {
+    throw new QuickAdventureError("select", null, error);
+  }
+
   let campaignId: string | null = null;
   let keyPrefix: string | null = null;
+  let campaignName = QUICK_ADVENTURE_CAMPAIGN_NAME;
   try {
-    const recipe = readSintermarkRecipe();
+    const recipe = readSintermarkRecipe(definition.recipeJson);
+    campaignName = recipe.name;
     const campaign = repository.createCampaign(ownerId, { name: recipe.name });
     campaignId = campaign.id;
     keyPrefix = keyPrefixForCampaign(campaign.id);
@@ -79,6 +97,8 @@ export async function createQuickAdventure({
       campaignId,
       keyPrefix,
       recipe,
+      party: definition.party,
+      openingLine: definition.openingLine,
     });
     const heroes = built.heroes.map((hero) => ({
       name: hero.name,
@@ -93,7 +113,7 @@ export async function createQuickAdventure({
       heroes,
     };
   } catch (error) {
-    if (campaignId && keyPrefix) archiveFailedCampaign(repository, ownerId, campaignId, keyPrefix);
+    if (campaignId && keyPrefix) archiveFailedCampaign(repository, ownerId, campaignId, keyPrefix, campaignName);
     const step = error instanceof SintermarkBuildStepError ? error.step : campaignId ? "build" : "create-campaign";
     const cause = error instanceof SintermarkBuildStepError ? error.cause : error;
     throw new QuickAdventureError(step, campaignId, cause);

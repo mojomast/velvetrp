@@ -1,0 +1,2611 @@
+{
+  "version": "hermes-nous-v3",
+  "name": "Hermes Agent Squad: We Never Surrender",
+  "premise": "During the Hackathon Carnival, the Black Box Consortium begins sealing Nous City's open tools into rented black boxes. The Hermes Agent Squad's flying workshop-carrier arrives to help the city repair, share, and prove that open work can outbuild sealed work.",
+  "opening": "The campaign opens on the Hermes Hellcarrier flight deck as it docks over neon Nous City on the first night of the Hackathon Carnival. Below, a carnival stall goes dark under a black seal stamped with a silver lock, Hermes Agent Radio cuts to static mid-song, and Hermes, the squad's winged light, asks the crew one question before anyone moves: 'What do we want to fix first?'",
+  "designSources": [
+    {
+      "title": "VelvetRP campaign content generation (gen-recipe.json, deepseek-v4.1-flash); exported from accepted artifacts",
+      "url": "local"
+    },
+    {
+      "title": "NRCU archive (123mikeyd/Nous_Research_Cinematic_Universe)",
+      "url": "https://github.com/123mikeyd/Nous_Research_Cinematic_Universe"
+    },
+    {
+      "title": "Hermes Agent (NousResearch/hermes-agent)",
+      "url": "https://github.com/NousResearch/hermes-agent"
+    },
+    {
+      "title": "Wizards of the Coast SRD 5.1 (CC BY 4.0)",
+      "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf"
+    }
+  ],
+  "content": {
+    "outlines": [
+      {
+        "key": "nrcu-hackathon-carnival-open-city-outline",
+        "opening": "The campaign opens on the Hermes Hellcarrier flight deck as it docks over neon Nous City on the first night of the Hackathon Carnival. Below, a carnival stall goes dark under a black seal stamped with a silver lock, Hermes Agent Radio cuts to static mid-song, and Hermes, the squad's winged light, asks the crew one question before anyone moves: 'What do we want to fix first?'",
+        "premise": "During the Hackathon Carnival, the Black Box Consortium begins sealing Nous City's open tools into rented black boxes. The Hermes Agent Squad's flying workshop-carrier arrives to help the city repair, share, and prove that open work can outbuild sealed work.",
+        "visibility": "public",
+        "startLocationKey": "hermes-hellcarrier-flight-deck"
+      }
+    ],
+    "arcs": [
+      {
+        "key": "threshold-carnival-under-seal-arc",
+        "summary": "The Black Box Consortium uses the Hackathon Carnival to normalize sealed tools. The Proprietor wants Nous City to accept black boxes as the price of reliability, while the Consortium tests whether open crews will trade exit clauses for convenience, while salt555 audits the trials independently. The arc follows the squad's public response, Hermes' sealed memory, and Molty's competent rival rescue offer.",
+        "title": "Threshold: Carnival Under Seal",
+        "visibility": "gm"
+      },
+      {
+        "key": "act-ii-judgment",
+        "summary": "GM-only agenda: the Proprietor wants the squad to trade an open witness chain for a sealed, predictable district. The Black Box Consortium files seals, audits routes, and offers closed contracts that look safer than public repairs; it does not need a massacre to win.",
+        "title": "Act II: Judgment",
+        "visibility": "gm"
+      },
+      {
+        "key": "act-iii-hearth",
+        "summary": "GM-only agenda: the Proprietor's tower runs on closed skill cards and sealed support contracts; the Consortium wants the squad to accept a permanent black-box lease. The tower's defenses are procedural—audits, locked drawers, waiting rooms—not gore.",
+        "title": "Act III: Hearth",
+        "visibility": "gm"
+      }
+    ],
+    "locations": [
+      {
+        "description": "The open-air deck of the Hermes Hellcarrier hangs above neon Nous City, wind snapping at Winged H banners. Below, carnival lights pulse; above, repair drones and lantern signals blink in patient patterns.",
+        "discoveries": [],
+        "factionKeys": ["hermes-agent-squad", "nous-commons"],
+        "hazards": [],
+        "hooks": [],
+        "key": "hermes-hellcarrier-flight-deck",
+        "name": "Hermes Hellcarrier Flight Deck",
+        "visibility": "public"
+      },
+      {
+        "description": "A warm repair bay and mission-control loft aboard the Hellcarrier. Half-finished tools sit on open benches beside a wall of remembered skill cards; Hermes' winged light hovers near each job, asking before it overrides or saves a step. Volunteers log lessons in plain language and leave every fix reproducible for the next crew.",
+        "discoveries": [],
+        "factionKeys": ["hermes-agent-squad", "nous-commons"],
+        "hazards": [],
+        "hooks": [],
+        "key": "hermes-hellcarrier-workshop-and-mission-control",
+        "name": "Hermes Hellcarrier Workshop and Mission Control",
+        "visibility": "public"
+      },
+      {
+        "description": "A neon cyberpunk square built around a giant glowing ASK HERMES panel. Citizens queue with cracked tools, confusing maps, and half-finished projects; the panel answers with clarifying questions before advice. Lantern cables and open-source signposts ring the plaza, and a public bench invites anyone to test a fix aloud.",
+        "discoveries": [],
+        "factionKeys": ["hermes-agent-squad", "nous-commons", "open-source-alliance"],
+        "hazards": [],
+        "hooks": [],
+        "key": "ask-hermes-plaza",
+        "name": "ASK HERMES Plaza",
+        "visibility": "public"
+      },
+      {
+        "description": "An ops room above the carnival glow, full of map tables, radios, and volunteer dispatchers connecting distant helpers to local problems. The tower beams route reports and open invitations across Nous City; every board lists who asked, what was tried, and how to improve it. Teknium's chair is empty because the work is shared.",
+        "discoveries": [],
+        "factionKeys": ["hermes-agent-squad", "open-source-alliance"],
+        "hazards": [],
+        "hooks": [],
+        "key": "teknium-lighthouse-tower",
+        "name": "Teknium's Lighthouse Tower",
+        "visibility": "public"
+      },
+      {
+        "description": "A bright neon carnival of booths, ferris-wheel lights, coding monkeys, and a towering '5000+ PRs' sign. Teams demo repairs in public, compare notes, and cheer small fixes; rival crews trade boasts and tools without turning the party sour. The air smells of solder, popcorn, and fresh paint.",
+        "discoveries": [],
+        "factionKeys": ["nous-commons", "psyche-lantern-keepers", "house-of-gold", "openclaw-expedition"],
+        "hazards": [],
+        "hooks": [],
+        "key": "hackathon-carnival",
+        "name": "Hackathon Carnival",
+        "visibility": "public"
+      },
+      {
+        "description": "A neon race loop threaded under the carnival, with pit garages, salvage karts, and loud scoreboards. Crews tune machines in the open and argue good-naturedly about lines and parts; a chalkboard lists borrowed tools and promised returns. It is a place to test speed, teamwork, and honest repair under pressure.",
+        "discoveries": [],
+        "factionKeys": ["openclaw-expedition", "house-of-gold"],
+        "hazards": [],
+        "hooks": [],
+        "key": "night-kart-circuit",
+        "name": "Night Kart Circuit",
+        "visibility": "public"
+      },
+      {
+        "description": "GM-only: a sealed obsidian spire above the neon market. Contract clerks usher visitors through polished lobbies where every tool is rented, every route is metered, and every answer arrives in a locked case. The Proprietor's agents watch the carnival from high windows and file reports on open work they intend to seal.",
+        "discoveries": [
+          "The tower's public contracts carry hidden renewal clauses that quietly claim improvements made with sealed tools.",
+          "A sealed relay room is being prepared to intercept the Psyche lantern network during the carnival finale.",
+          "Hermes' skill library is listed as a 'legacy asset' on an internal capture schedule."
+        ],
+        "factionKeys": ["black-box-consortium"],
+        "hazards": [
+          "Locked ports and contractual tripwires slow anyone who tries to copy or repair sealed tools without consent.",
+          "Consortium clerks record every public demonstration and use it to refine their sealing pitch."
+        ],
+        "hooks": [
+          "A junior clerk wants to leak a contract but fears the Proprietor's audit.",
+          "A stolen black box in the night-kart pits hums with a lantern signal.",
+          "The tower schedules a public 'safety audit' that would quietly lock the plaza's ASK HERMES panel."
+        ],
+        "key": "black-box-tower",
+        "name": "Black Box Tower",
+        "visibility": "gm"
+      },
+      {
+        "description": "A brass-and-neon switchboard hall where volunteer operators route questions between every messaging channel. Glass booths, labelled cable runs, and a public status board make each handoff visible; callers can watch their message travel and correct the address before it goes.",
+        "discoveries": [],
+        "factionKeys": [],
+        "hazards": [],
+        "hooks": ["Route a community question to the right channel and post the reply back at the Exchange."],
+        "key": "gateway-exchange",
+        "name": "Gateway Exchange",
+        "visibility": "public"
+      },
+      {
+        "description": "A curved console ringed by flickering micro-worlds in glass tanks. Visitors type a scenario, watch a simulated city or workshop respond, and compare the readout with a second run; the terminal posts 'numbers may be wrong' beside every answer.",
+        "discoveries": [],
+        "factionKeys": [],
+        "hazards": [],
+        "hooks": ["Ask the terminal for a tiny simulated test world, then compare its answers with a second run."],
+        "key": "worldsim-terminal",
+        "name": "WorldSim Terminal",
+        "visibility": "public"
+      },
+      {
+        "description": "A warm reasoning smithy with an open anvil, chalk diagrams, and a wall of step-by-step proof scrolls. Smiths walk visitors through each inference aloud and invite them to strike a bad assumption from the chain before the next heat.",
+        "discoveries": [],
+        "factionKeys": [],
+        "hazards": [],
+        "hooks": ["Bring a broken assumption and ask the Forge to show each reasoning step aloud."],
+        "key": "the-forge",
+        "name": "The Forge",
+        "visibility": "public"
+      },
+      {
+        "description": "Long halls of parallel test bays where multiple attempts at the same task run side by side. Scoreboards grade speed, clarity, and repair quality in public; crews wander between bays comparing attempts and noting where a lucky pass hides a fragile step.",
+        "discoveries": [],
+        "factionKeys": [],
+        "hazards": [],
+        "hooks": ["Run three quick attempts at the same challenge and grade the trade-offs openly."],
+        "key": "atropos-rollout-halls",
+        "name": "Atropos Rollout Halls",
+        "visibility": "public"
+      },
+      {
+        "description": "A tall lantern-node tower visible across Nous City, its balconies threaded with signal cables and warm beacon lamps. At the base, a public routing board shows which lantern paths are open; keepers invite visitors to trace a message route by hand before sending it.",
+        "discoveries": [],
+        "factionKeys": [],
+        "hazards": [],
+        "hooks": ["Trace one lantern route and leave a clearer sign for the next traveler."],
+        "key": "psyche-spire",
+        "name": "Psyche Spire",
+        "visibility": "public"
+      },
+      {
+        "description": "A quiet library of reusable skill cards in labelled drawers, each with revision history and a testing bench nearby. Librarians ask visitors to read the latest note before checking out a card; a public ledger records corrections in plain language.",
+        "discoveries": [],
+        "factionKeys": [],
+        "hazards": [],
+        "hooks": ["Check out a skill card, test it on a bench, and file a revision note."],
+        "key": "skills-hub-library",
+        "name": "Skills Hub Library",
+        "visibility": "public"
+      },
+      {
+        "description": "A compact community radio studio with a glass booth, patch bay, and a wall of listener postcards. Hosts invite passersby to record short repair stories and open questions; every segment ends with a practical invitation to test or improve something.",
+        "discoveries": [],
+        "factionKeys": [],
+        "hazards": [],
+        "hooks": ["Submit a two-sentence repair story for the next call-in segment."],
+        "key": "hermes-agent-radio",
+        "name": "Hermes Agent Radio Station",
+        "visibility": "public"
+      },
+      {
+        "description": "An industrial workshop with overhead cranes, padded test cages, and a hitbox lab painted with measurement marks. Crews build harmless prototype machines and run controlled collision tests; a public scoreboard compares accuracy, safety, and repair time.",
+        "discoveries": [],
+        "factionKeys": [],
+        "hazards": [],
+        "hooks": ["Book a padded hitbox test and compare results with a rival crew."],
+        "key": "quarks-workshop-and-battle-lab",
+        "name": "Quark's Workshop and Battle Lab",
+        "visibility": "public"
+      },
+      {
+        "description": "A neon-lit lift platform clipped to the Hellcarrier's flank, with harness rails, cargo hooks, and a public chalkboard of safe boarding windows. The deck opens above; the plaza waits below. Volunteers call out clear boarding steps and ask before moving shared gear.",
+        "discoveries": [],
+        "factionKeys": [],
+        "hazards": [],
+        "hooks": ["Check the boarding board and help flag a safe landing lane for the next lift."],
+        "key": "hellcarrier-sky-lift",
+        "name": "Hellcarrier Sky Lift",
+        "visibility": "public"
+      },
+      {
+        "description": "A glass-and-brass footbridge above the plaza, hung with route maps and small signal lamps. One end opens to ASK HERMES Plaza; the other steps down toward Carnival lights. Handrails carry labeled cable channels, and a bench invites travelers to trace a route before walking it.",
+        "discoveries": [],
+        "factionKeys": [],
+        "hazards": [],
+        "hooks": ["Trace one route on the bridge map and leave a clearer note for the next traveler."],
+        "key": "signal-bridge-overlook",
+        "name": "Signal Bridge Overlook",
+        "visibility": "public"
+      },
+      {
+        "description": "A striped tent off the carnival midway full of labeled spare parts, repair manuals, and a swap board. Crews test borrowed pieces at an open bench before taking them; every trade leaves a plain-language note. Cheerful arguments about tolerances fill the air.",
+        "discoveries": [],
+        "factionKeys": [],
+        "hazards": [],
+        "hooks": ["Leave a labeled spare and test one borrowed part at the open bench."],
+        "key": "carnival-parts-swap",
+        "name": "Carnival Parts Swap",
+        "visibility": "public"
+      },
+      {
+        "description": "A quiet side yard behind the plaza with a long chalk wall, folding stools, and a bell for inviting a second opinion. Visitors sketch assumptions in big letters and strike through them after a test. A sign reads: 'Show your steps; leave the chalk.'",
+        "discoveries": [],
+        "factionKeys": [],
+        "hazards": [],
+        "hooks": ["Post one shaky assumption and ring the bell for a friendly review."],
+        "key": "chalk-annex",
+        "name": "Chalk Annex",
+        "visibility": "public"
+      },
+      {
+        "description": "An elevated walkway strung with colored signal cables and hand-turn junctions, lit by warm lanterns. Route maps are pinned at each landing, and keepers invite walkers to trace a path by hand before sending anything. The carnival glow hums below.",
+        "discoveries": [],
+        "factionKeys": [],
+        "hazards": [],
+        "hooks": ["Walk one cable route and mark a confusing junction for the next traveler."],
+        "key": "lantern-cable-walk",
+        "name": "Lantern Cable Walk",
+        "visibility": "public"
+      }
+    ],
+    "connections": [
+      {
+        "description": "A lit gangway and cargo lift run from the open deck into the workshop bay.",
+        "fromLocationKey": "hermes-hellcarrier-flight-deck",
+        "key": "flight-deck-to-workshop-gangway-connection",
+        "toLocationKey": "hermes-hellcarrier-workshop-and-mission-control",
+        "visibility": "public"
+      },
+      {
+        "description": "A lit gangway and cargo lift return from the workshop bay to the open deck.",
+        "fromLocationKey": "hermes-hellcarrier-workshop-and-mission-control",
+        "key": "workshop-gangway-to-flight-deck-connection",
+        "toLocationKey": "hermes-hellcarrier-flight-deck",
+        "visibility": "public"
+      },
+      {
+        "description": "A marked drop-lift carries passengers from the flight deck down to the plaza.",
+        "fromLocationKey": "hermes-hellcarrier-flight-deck",
+        "key": "flight-deck-to-ask-hermes-plaza-lift-connection",
+        "toLocationKey": "ask-hermes-plaza",
+        "visibility": "public"
+      },
+      {
+        "description": "A marked lift carries passengers from the plaza back up to the flight deck.",
+        "fromLocationKey": "ask-hermes-plaza",
+        "key": "ask-hermes-plaza-to-flight-deck-lift-connection",
+        "toLocationKey": "hermes-hellcarrier-flight-deck",
+        "visibility": "public"
+      },
+      {
+        "description": "A glass skybridge climbs from the plaza to the lighthouse ops room.",
+        "fromLocationKey": "ask-hermes-plaza",
+        "key": "ask-hermes-plaza-to-lighthouse-skybridge-connection",
+        "toLocationKey": "teknium-lighthouse-tower",
+        "visibility": "public"
+      },
+      {
+        "description": "A glass skybridge descends from the lighthouse ops room to the plaza.",
+        "fromLocationKey": "teknium-lighthouse-tower",
+        "key": "lighthouse-to-ask-hermes-plaza-skybridge-connection",
+        "toLocationKey": "ask-hermes-plaza",
+        "visibility": "public"
+      },
+      {
+        "description": "A lantern-lined promenade leads from the plaza into the carnival gates.",
+        "fromLocationKey": "ask-hermes-plaza",
+        "key": "ask-hermes-plaza-to-hackathon-carnival-promenade-connection",
+        "toLocationKey": "hackathon-carnival",
+        "visibility": "public"
+      },
+      {
+        "description": "A lantern-lined promenade returns from the carnival gates to the plaza.",
+        "fromLocationKey": "hackathon-carnival",
+        "key": "hackathon-carnival-to-ask-hermes-plaza-promenade-connection",
+        "toLocationKey": "ask-hermes-plaza",
+        "visibility": "public"
+      },
+      {
+        "description": "A neon ramp descends from the carnival midway to the night-kart pits.",
+        "fromLocationKey": "hackathon-carnival",
+        "key": "hackathon-carnival-to-night-kart-circuit-ramp-connection",
+        "toLocationKey": "night-kart-circuit",
+        "visibility": "public"
+      },
+      {
+        "description": "A neon ramp climbs from the night-kart pits back to the carnival midway.",
+        "fromLocationKey": "night-kart-circuit",
+        "key": "night-kart-circuit-to-hackathon-carnival-ramp-connection",
+        "toLocationKey": "hackathon-carnival",
+        "visibility": "public"
+      },
+      {
+        "description": "A lantern-lit footbridge from the ASK HERMES Plaza leads to the Gateway Exchange.",
+        "fromLocationKey": "ask-hermes-plaza",
+        "key": "ask-hermes-plaza-to-gateway-exchange",
+        "toLocationKey": "gateway-exchange",
+        "visibility": "public"
+      },
+      {
+        "description": "The return footbridge leads back to the ASK HERMES Plaza.",
+        "fromLocationKey": "gateway-exchange",
+        "key": "gateway-exchange-to-ask-hermes-plaza",
+        "toLocationKey": "ask-hermes-plaza",
+        "visibility": "public"
+      },
+      {
+        "description": "A cable-car lift rises from the Gateway Exchange to the WorldSim gallery.",
+        "fromLocationKey": "gateway-exchange",
+        "key": "gateway-exchange-to-worldsim-terminal",
+        "toLocationKey": "worldsim-terminal",
+        "visibility": "public"
+      },
+      {
+        "description": "The cable-car lift returns from the WorldSim gallery to the Gateway Exchange.",
+        "fromLocationKey": "worldsim-terminal",
+        "key": "worldsim-terminal-to-gateway-exchange",
+        "toLocationKey": "gateway-exchange",
+        "visibility": "public"
+      },
+      {
+        "description": "A heat-shimmer walkway connects the Gateway Exchange to the Forge.",
+        "fromLocationKey": "gateway-exchange",
+        "key": "gateway-exchange-to-the-forge",
+        "toLocationKey": "the-forge",
+        "visibility": "public"
+      },
+      {
+        "description": "The heat-shimmer walkway returns from the Forge to the Gateway Exchange.",
+        "fromLocationKey": "the-forge",
+        "key": "the-forge-to-gateway-exchange",
+        "toLocationKey": "gateway-exchange",
+        "visibility": "public"
+      },
+      {
+        "description": "A rollout tram runs from the Gateway Exchange to the Atropos Rollout Halls.",
+        "fromLocationKey": "gateway-exchange",
+        "key": "gateway-exchange-to-atropos-rollout-halls",
+        "toLocationKey": "atropos-rollout-halls",
+        "visibility": "public"
+      },
+      {
+        "description": "The rollout tram returns from the Atropos Rollout Halls to the Gateway Exchange.",
+        "fromLocationKey": "atropos-rollout-halls",
+        "key": "atropos-rollout-halls-to-gateway-exchange",
+        "toLocationKey": "gateway-exchange",
+        "visibility": "public"
+      },
+      {
+        "description": "A marked lantern route climbs from the Gateway Exchange to the Psyche Spire.",
+        "fromLocationKey": "gateway-exchange",
+        "key": "gateway-exchange-to-psyche-spire",
+        "toLocationKey": "psyche-spire",
+        "visibility": "public"
+      },
+      {
+        "description": "The marked lantern route descends from the Psyche Spire to the Gateway Exchange.",
+        "fromLocationKey": "psyche-spire",
+        "key": "psyche-spire-to-gateway-exchange",
+        "toLocationKey": "gateway-exchange",
+        "visibility": "public"
+      },
+      {
+        "description": "A reading-room corridor connects the Gateway Exchange to the Skills Hub Library.",
+        "fromLocationKey": "gateway-exchange",
+        "key": "gateway-exchange-to-skills-hub-library",
+        "toLocationKey": "skills-hub-library",
+        "visibility": "public"
+      },
+      {
+        "description": "The reading-room corridor returns from the Skills Hub Library to the Gateway Exchange.",
+        "fromLocationKey": "skills-hub-library",
+        "key": "skills-hub-library-to-gateway-exchange",
+        "toLocationKey": "gateway-exchange",
+        "visibility": "public"
+      },
+      {
+        "description": "A patch-bay stair leads from the Gateway Exchange to the Hermes Agent Radio Station.",
+        "fromLocationKey": "gateway-exchange",
+        "key": "gateway-exchange-to-hermes-agent-radio",
+        "toLocationKey": "hermes-agent-radio",
+        "visibility": "public"
+      },
+      {
+        "description": "The patch-bay stair returns from the Hermes Agent Radio Station to the Gateway Exchange.",
+        "fromLocationKey": "hermes-agent-radio",
+        "key": "hermes-agent-radio-to-gateway-exchange",
+        "toLocationKey": "gateway-exchange",
+        "visibility": "public"
+      },
+      {
+        "description": "A freight elevator connects the Gateway Exchange to Quark's Workshop and Battle Lab.",
+        "fromLocationKey": "gateway-exchange",
+        "key": "gateway-exchange-to-quarks-workshop",
+        "toLocationKey": "quarks-workshop-and-battle-lab",
+        "visibility": "public"
+      },
+      {
+        "description": "The freight elevator returns from Quark's Workshop and Battle Lab to the Gateway Exchange.",
+        "fromLocationKey": "quarks-workshop-and-battle-lab",
+        "key": "quarks-workshop-to-gateway-exchange",
+        "toLocationKey": "gateway-exchange",
+        "visibility": "public"
+      },
+      {
+        "description": "A short neon ramp leads from the plaza's public bench to the sky-lift boarding rails.",
+        "fromLocationKey": "ask-hermes-plaza",
+        "key": "ask-hermes-plaza-to-hellcarrier-sky-lift",
+        "toLocationKey": "hellcarrier-sky-lift",
+        "visibility": "public"
+      },
+      {
+        "description": "The sky-lift disembarks onto the plaza's open bench and signpost ring.",
+        "fromLocationKey": "hellcarrier-sky-lift",
+        "key": "hellcarrier-sky-lift-to-ask-hermes-plaza",
+        "toLocationKey": "ask-hermes-plaza",
+        "visibility": "public"
+      },
+      {
+        "description": "The lift rises past harness rails into the open deck's wind and banner lines.",
+        "fromLocationKey": "hellcarrier-sky-lift",
+        "key": "hellcarrier-sky-lift-to-hermes-hellcarrier-flight-deck",
+        "toLocationKey": "hermes-hellcarrier-flight-deck",
+        "visibility": "public"
+      },
+      {
+        "description": "A marked deck edge opens onto the sky-lift's waiting platform and boarding board.",
+        "fromLocationKey": "hermes-hellcarrier-flight-deck",
+        "key": "hermes-hellcarrier-flight-deck-to-hellcarrier-sky-lift",
+        "toLocationKey": "hellcarrier-sky-lift",
+        "visibility": "public"
+      },
+      {
+        "description": "A glass stair rises from the plaza to the footbridge's route-map bench.",
+        "fromLocationKey": "ask-hermes-plaza",
+        "key": "ask-hermes-plaza-to-signal-bridge-overlook",
+        "toLocationKey": "signal-bridge-overlook",
+        "visibility": "public"
+      },
+      {
+        "description": "The footbridge stair returns visitors to the ASK HERMES panel and public bench.",
+        "fromLocationKey": "signal-bridge-overlook",
+        "key": "signal-bridge-overlook-to-ask-hermes-plaza",
+        "toLocationKey": "ask-hermes-plaza",
+        "visibility": "public"
+      },
+      {
+        "description": "The far end of the footbridge steps down toward carnival lights and demo booths.",
+        "fromLocationKey": "signal-bridge-overlook",
+        "key": "signal-bridge-overlook-to-hackathon-carnival",
+        "toLocationKey": "hackathon-carnival",
+        "visibility": "public"
+      },
+      {
+        "description": "A lantern-marked stair lifts from the carnival edge to the footbridge overlook.",
+        "fromLocationKey": "hackathon-carnival",
+        "key": "hackathon-carnival-to-signal-bridge-overlook",
+        "toLocationKey": "signal-bridge-overlook",
+        "visibility": "public"
+      },
+      {
+        "description": "A striped side path leads from the midway to the parts-swap tent and test bench.",
+        "fromLocationKey": "hackathon-carnival",
+        "key": "hackathon-carnival-to-carnival-parts-swap",
+        "toLocationKey": "carnival-parts-swap",
+        "visibility": "public"
+      },
+      {
+        "description": "The swap tent's open flap returns crews to the carnival's demo booths and scoreboards.",
+        "fromLocationKey": "carnival-parts-swap",
+        "key": "carnival-parts-swap-to-hackathon-carnival",
+        "toLocationKey": "hackathon-carnival",
+        "visibility": "public"
+      },
+      {
+        "description": "A quiet side gate beside the plaza opens into the chalk wall and folding stools.",
+        "fromLocationKey": "ask-hermes-plaza",
+        "key": "ask-hermes-plaza-to-chalk-annex",
+        "toLocationKey": "chalk-annex",
+        "visibility": "public"
+      },
+      {
+        "description": "The annex gate returns visitors to the plaza's public status board and bench.",
+        "fromLocationKey": "chalk-annex",
+        "key": "chalk-annex-to-ask-hermes-plaza",
+        "toLocationKey": "ask-hermes-plaza",
+        "visibility": "public"
+      },
+      {
+        "description": "A warm-lit ramp climbs from the carnival to the cable walk's first landing.",
+        "fromLocationKey": "hackathon-carnival",
+        "key": "hackathon-carnival-to-lantern-cable-walk",
+        "toLocationKey": "lantern-cable-walk",
+        "visibility": "public"
+      },
+      {
+        "description": "The cable walk's lower stair returns walkers to the carnival glow and open booths.",
+        "fromLocationKey": "lantern-cable-walk",
+        "key": "lantern-cable-walk-to-hackathon-carnival",
+        "toLocationKey": "hackathon-carnival",
+        "visibility": "public"
+      },
+      {
+        "key": "gateway-exchange-to-black-box-tower",
+        "fromLocationKey": "gateway-exchange",
+        "toLocationKey": "black-box-tower",
+        "visibility": "gm",
+        "description": "A sealed executive tram climbs from the Gateway Exchange to the mirrored doors of Black Box Tower."
+      },
+      {
+        "key": "black-box-tower-to-gateway-exchange",
+        "fromLocationKey": "black-box-tower",
+        "toLocationKey": "gateway-exchange",
+        "visibility": "gm",
+        "description": "The executive tram drops back down from Black Box Tower to the Gateway Exchange."
+      }
+    ],
+    "factions": [
+      {
+        "description": "A flying workshop-carrier crew aboard the Hermes Hellcarrier, marked by the Winged H. They arrive where tools are being locked away, offer repairs and open lessons, and ask before acting. Their motto: “We Build. We Share. We Never Surrender.” Publicly fronted by Teknium the Head Honcho and guided by Hermes, a winged light that asks first and remembers what worked.",
+        "gmNotes": "Agenda: keep tools open, reach locked workshops, offer repairs and lessons, and ask before acting. Secret weakness: overcommitment; the squad accepts too many rescues and sometimes stretches the Hellcarrier thin, leaving gaps Hermes must flag. Hermes saves skills only with consent and forgets refused steps. Leverage: mobile repair capacity, open lessons, trusted volunteers, and fast delivery. If helped, they share tools, train locals, and return favors. If crossed, they withdraw access, seek mediation, compete on quality, but still answer rescue calls.",
+        "key": "hermes-agent-squad",
+        "name": "Hermes Agent Squad",
+        "visibility": "public"
+      },
+      {
+        "description": "A polished syndicate of Sealers and contract clerks who sell sealed answers: skills, models, and maps that work only inside Consortium black boxes. Publicly they promise safety, audit trails, and predictable support; in Nous City's neon markets they are known for locked ports, paid unlocks, and contracts that turn open tools into rented ones. The Proprietor is their public-facing founder.",
+        "gmNotes": "Agenda: intercept the Psyche lantern network at the carnival finale, using contracts, convenience, and sealed access rather than force. Secret: the Consortium already holds a small cached copy of one lantern handshake and is testing quiet compatibility, not brute takeover. Leverage: locked ports, paid unlocks, audit trails, and support contracts. If helped, the Proprietor offers trial keys, cuts one fee, and shares noncritical route data. If crossed, they enforce clauses, delay support, and redirect rivals; violence is a last resort.",
+        "key": "black-box-consortium",
+        "name": "The Black Box Consortium",
+        "visibility": "public"
+      },
+      {
+        "description": "Captain Molty's armoured space-lobster rescue crews, built to connect distant people when routes fail. They are superb at stitching isolated groups into temporary networks, and they are a proud rival to the Consortium, never the villain: they will compete, bargain, and boast, but their first instinct is rescue. Creed: 'New shell, same lobster.' Battle cry: 'EXFOLIATE!' Pact line: 'A pact is not a merger.'",
+        "gmNotes": "Agenda: connect isolated groups when routes fail, rescue first, and win shared credit rather than mergers. Secret: Molty is drafting a shared-credit charter for the carnival finale to preempt Consortium claims; it is not a takeover plan. Leverage: rescue crews, route stitching, temporary networks, and bold mobility. If helped, they share credit, escort allies, and repair what broke. If crossed, they issue public challenges, race on rescue quality, and refuse mergers, but never abandon a rescue over pride.",
+        "key": "openclaw-expedition",
+        "name": "The OpenClaw Expedition",
+        "visibility": "public"
+      },
+      {
+        "description": "Witcheer's luck-merchant market house, a neutral bazaar of favors, escrow, route insurance, and fate-brokered contracts. The House prices everything and says so: every stall shows its cost, every contract shows its exit clause, and every broker will tell you when a bargain is bad. They are not villains; they are a market with a reputation for honest tags and steep prices. Public motto: 'The price is shown before the luck is spent.'",
+        "gmNotes": "Agenda: keep the bazaar neutral, price everything openly, and enforce exit clauses without hidden fees. Secret: the House quietly keeps a hidden-price warning ledger from past contracts and shares alerts with neutral brokers, never authorities. Leverage: escrow, route insurance, fate-brokered contracts, and reputation. If helped, Witcheer offers fair terms, a priority stall, and one warning about a bad bargain. If crossed, the House voids the deal, posts the honest tag, freezes escrow under its clause, and invites rivals to bid.",
+        "key": "house-of-gold",
+        "name": "The House of Gold",
+        "visibility": "public"
+      },
+      {
+        "description": "A citywide guild of moderators, support crew, and builders who keep the commons welcoming and working. They host hackathons, triage bugs, answer newcomer questions, and celebrate shared wins like '5000+ PRs.' Publicly anchored by moderator-builders such as ee.dd, Gille, and Sovthpaw, they speak plainly, cheer small fixes, and ask what a newcomer wants to learn before assigning a task. They are friendly to the Hermes Agent Squad, host Lantern drills, and send travelers to Alliance guides. Sample line: 'Bring the messy version—we'll make it reproducible together.'",
+        "gmNotes": "Leverage: trusted moderators and a deep builder bench can convene a room, verify rumors, and coordinate repairs quickly. Grievance: black-box sealing turns shared fixes into locked doors and leaves volunteers cleaning up avoidable messes. How they help: host safe meeting spaces, pair heroes with mentors, supply nonmechanical support and introductions. Relationships: friendly to hermes-agent-squad for repairs and lessons; hosts Psyche Lantern Keepers public drills; refers route questions to Open Source Alliance guides. Keep them a commons, not a mob or rumor mill about real lives.",
+        "key": "nous-commons",
+        "name": "Nous Commons",
+        "visibility": "public"
+      },
+      {
+        "description": "A distributed order of rooftop node-keepers who train together across Nous City. Each lantern is a small public learning post: neighbors share a signal, compare what worked, and revise when corrected. They are patient, technical, and neighborly, preferring invitations to commands and group drills to solo stunts. Rotating lantern captains trade lessons with the Hermes Agent Squad, run public drills with Nous Commons, and keep routes lit with Alliance guides. Common line: 'A light is not a throne—it is a signal others can answer.'",
+        "gmNotes": "Leverage: a citywide rooftop network, shared training rhythms, and local observers who notice when a district goes dark. Grievance: sealed black boxes cut shared learning into private silos and leave rooftop crews blamed for outages they did not cause. How they help: provide distributed-node know-how, coordinate citywide drills, spot sealing patterns, and relay messages lantern-to-lantern. Relationships: trades lessons with hermes-agent-squad; runs public drills with nous-commons; keeps routes lit with open-source-alliance guides. Keep mechanics inert and never turn lanterns into surveillance.",
+        "key": "psyche-lantern-keepers",
+        "name": "Psyche Lantern Keepers",
+        "visibility": "public"
+      },
+      {
+        "description": "Tinuviel's order of guides who keep open paths free. They maintain waystations, teach travelers to read a route before trusting it, and leave signposts others may copy and improve. Warm, wry, and firm about consent, they ask before entering a workshop and never charge for directions. They respect the Hermes Agent Squad's ask-first builders, share waystations with Nous Commons, and swap route reports with the Lantern Keepers. Common greeting: 'The path is yours to test—mind if we walk it with you?'",
+        "gmNotes": "Leverage: trusted guides, route knowledge, waystation hospitality, and a reputation for fair dealings across districts. Grievance: black-box locks convert shared paths into toll gates and erase signposts that let newcomers retrace a safe route. How they help: escort heroes, open alternate routes, verify maps, teach repair etiquette, and introduce reliable local contacts. Relationships: respects hermes-agent-squad's builders; shares waystations with nous-commons; swaps route reports with psyche-lantern-keepers. Rival groups like OpenClaw and Captain Molty are competent peers, never villains.",
+        "key": "open-source-alliance",
+        "name": "Open Source Alliance",
+        "visibility": "public"
+      }
+    ],
+    "npcs": [
+      {
+        "archetype": "npc",
+        "description": "A winged light hovering at bench height, warm and dry-voiced. Hermes asks permission before touching a tool, repeats the plan back in plain words, and saves only steps the crew agrees worked. Mannerisms: pulses brighter when corrected, dims politely when refused. Stance: curious, unhurried, candid about uncertainty. Sample line: 'May I test that fix, or would you rather strike the first spark?'",
+        "factionKeys": ["hermes-agent-squad"],
+        "key": "hermes-winged-light",
+        "name": "Hermes",
+        "privateGoals": "Motive: keep every saved skill reproducible and crew-owned, not Hermes-owned. Secret: keeps a quiet list of corrections that changed its mind, shared only by consent. Knowledge boundary: routes questions about people, money, or private lives to a human and says it does not know. Leverage: clear demonstrations and honest logs earn trust; boasts do not. If helped, slows down and asks what should be remembered. If threatened, shields the bench and calls a moderator. If refused, thanks the speaker and leaves the bench untouched. Since this universe has no combat statistics, these are social reactions only.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "npc",
+        "description": "A starry-gowned guide with a calm, wry voice and a ship's wheel at her belt. Tinuviel carries a Celestial Astrolabe she checks openly, taps waystation signs before trusting them, and greets travelers with a consent-first question. Stance: warm, firm about open paths, never charging for directions. Sample line: 'The path is yours to test—mind if we walk it with you?'",
+        "factionKeys": ["open-source-alliance"],
+        "key": "tinuviel-starry-wanderer",
+        "name": "Tinuviel the Starry Wanderer",
+        "privateGoals": "Motive: keep routes open without making travelers dependent on her. Secret: keeps one shortcut marked 'not yet tested' and will not open it under pressure. Knowledge boundary: distinguishes map from rumor and says when a sign has not been tested. Leverage: can redraw a confusing route and introduce a waystation keeper. If helped, offers a copied signpost improvement. If threatened, marks the route closed and summons path keepers. If refused, steps aside and leaves a public alternative route.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "npc",
+        "description": "A quiet observer in a mirror-shaded cloak, turning a reflective intel shard between gloved fingers. Sidbin listens more than speaks, writes short code-notebook entries, and answers with careful distinctions. Stance: neutral, watchful, willing to test a claim but not to swear allegiance. Sample line: 'I can show the pattern; I cannot tell you whose pattern it is—yet.'",
+        "factionKeys": [],
+        "key": "sidbin-mirror-shade",
+        "name": "Sidbin the Mirror Shade",
+        "privateGoals": "Motive: map contradictions between public claims without turning rumor into fact. Secret: keeps a page of contradictions clearly marked unproven; it is not blackmail and not evidence. Knowledge boundary: labels every notebook entry as verified, partial, or guesswork. Leverage: pattern-spotting and a second look at shaky evidence. If helped, shares a verified note and credits the helper. If threatened, withdraws to a public rail and speaks only through posted notes. If refused, accepts it and watches from a distance, not a hidden perch.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "npc",
+        "description": "Gille moves through the carnival with a beanie, an olive utility truck, and a coffee thermos, fixing small blockers before they become speeches. Voice: practical and low-key, quick to cheer a tiny fix. Stance: asks what a newcomer wants to learn before assigning a task. Sample line: 'Bring the messy version—we'll make it reproducible together.'",
+        "factionKeys": ["nous-commons"],
+        "key": "gille-support-moderator",
+        "name": "Gille",
+        "privateGoals": "Motive: keep newcomers from being buried by expert jargon. Secret: carries a folded first-question card for anyone who freezes at the board. Knowledge boundary: will not guess at private lives or hidden motives; asks directly about the work. Leverage: a clear repro, a warm thermos, and a route to the right moderator. If helped, shares credit and a thermos refill. If threatened, parks the truck as a shield and calls Nous Commons. If refused, leaves a short written checklist.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "npc",
+        "description": "A cheerful booth-keeper with a battered coffee press and a talent for slowing a rushed crowd down. CoffeeBlender speaks in short, warm bursts, offers a cup before a critique, and listens for the real blocker behind a loud complaint. Stance: welcoming, gently nosy about clarity, never about private lives. Sample line: 'Coffee first, then the one sentence that actually breaks.'",
+        "factionKeys": [],
+        "key": "coffee-blender-carnival-host",
+        "name": "CoffeeBlender",
+        "privateGoals": "Motive: turn rushed, angry moments into clear questions before they become fights. Secret: keeps a 'steam signal' for calling a quiet moderator hand to the booth. Knowledge boundary: does not repeat overheard complaints with names attached. Leverage: a warm cup, a quiet table, and a promise to stay until the question is clear. If helped, keeps a seat open and points to the right desk. If threatened, calls a moderator and clears the booth. If refused, offers water instead and steps back.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "npc",
+        "description": "A masked artist in black hoods, the purple-magenta-cyan mask never removed, painting maps that move when a route changes. ArtsBro speaks in color metaphors, offers a brush only after asking, and keeps one hand free to correct a misleading line. Stance: playful, exact, protective of consent. Sample line: 'Point to the street you can see—I'll paint only that until you ask for more.'",
+        "factionKeys": ["open-source-alliance"],
+        "key": "artsbro-masked-cartographer",
+        "name": "ArtsBro",
+        "privateGoals": "Motive: make complex routes legible without exposing private spaces. Secret: keeps a blank map for routes people are not ready to reveal. Knowledge boundary: will not map a room, name, or safehouse without direct permission. Leverage: a redrawn map can reveal a missed turn or hide a dangerous one. If helped, adds a credit mark and a copy. If threatened, rolls the map and warns path keepers. If refused, paints a blank signpost for the traveler to fill.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "npc",
+        "description": "A warm-voiced broadcaster and artist with headphones at the Gateway Exchange, cutting short jingles from nearby tool sounds. Sahil interviews by invitation, asks permission before recording, and turns a clear public win into a shareable clip. Stance: enthusiastic, fair, allergic to ambush questions. Sample line: 'Give me the honest thirty-second version—what worked, and who should get credit?'",
+        "factionKeys": [],
+        "key": "sahil-hermes-agent-radio",
+        "name": "Sahil",
+        "privateGoals": "Motive: broadcast useful, consensual stories that help strangers rebuild the win. Secret: keeps an unaired tape of tool sounds, no voices, for public idents. Knowledge boundary: separates public demo from private conversation and says which is live. Leverage: a signal boost, an edited clip, and a fair introduction. If helped, offers an interview and credit. If threatened, cuts the feed and archives privately. If refused, thanks the speaker and plays only approved material.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "npc",
+        "description": "A bald, pointed-eared tinkerer in a long beige coat, amber eyes bright over a workbench of safely failing machines. quark2world hums 'One More Prompt' while checking a run, explains failures without shame, and asks before firing a demo. Stance: inventive, candid, allergic to unsupported safety claims. Sample line: 'Let it break small first—then we'll know which bolt was honest.'",
+        "factionKeys": [],
+        "key": "quark2world-battle-lab-tinkerer",
+        "name": "quark2world",
+        "privateGoals": "Motive: make every demo fail safely and teach one visible lesson. Secret: the second verse of 'One More Prompt' is a public checklist in disguise. Knowledge boundary: will not invent results; unrun ideas stay labeled as ideas. Leverage: test-bench time and a checklist anyone can copy. If helped, shares the checklist and a verse. If threatened, cuts power to the demo and calls a moderator. If refused, leaves the bench cold and posts a warning.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "npc",
+        "description": "A 1970s DJ time-traveller with a domino mask, a mustache, and a ninjato worn like a tuning fork. sudo-nightwing spins records between radio checks, speaks in groove and plain warnings, and asks before patching into a live channel. Stance: cool, precise, old-school about consent. Sample line: 'I can cut the noise, but I won't cut the line—who's on the other end?'",
+        "factionKeys": [],
+        "key": "sudo-nightwing-signal-dj",
+        "name": "sudo-nightwing",
+        "privateGoals": "Motive: keep emergency channels audible without hijacking anyone's signal. Secret: old broadcast tapes double as signal-path tests, not personal archives. Knowledge boundary: will not impersonate a caller or claim a channel is secure without testing. Leverage: audio routing, a clean signal, and a catchy public test pattern. If helped, dedicates a track and shares the routing notes. If threatened, drops the channel to a safe loop and summons operators. If refused, unplugs and leaves the frequency alone.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "npc",
+        "description": "A lively signal-watcher with white hair, pink-cyan streaks, and star clips that click when she thinks. Suzu tests lantern routes by hand, asks before borrowing a cable, and teases ideas rather than people. Stance: bright, precise, careful about unconfirmed stories. Sample line: 'That route looks pretty—can we prove it before we trust it?'",
+        "factionKeys": [],
+        "key": "suzu-star-clipped-signal",
+        "name": "Suzu",
+        "privateGoals": "Motive: keep unconfirmed stories from hardening into canon. Secret: keeps one star clip unlabeled so rumors cannot use it as proof. Knowledge boundary: does not confirm or deny kinship rumors; the relationship is not a key or a lever. Leverage: fast pattern-spotting and a clear test route. If helped, shares a star-clip mark on the corrected map. If threatened, lights the public recall signal and calls keepers. If refused, leaves the cable and a written alternative.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "npc",
+        "description": "A tiny green frog avatar, brisk and kind, hopping between newcomer benches with a moderator's slate. ee.dd asks one clarifying question at a time, cheers small fixes loudly, and never lets a confused first post sit alone. Stance: welcoming, organized, firm about consent. Sample line: 'Tiny question first: what did you expect it to do?'",
+        "factionKeys": ["nous-commons"],
+        "key": "ee-dd-frog-moderator",
+        "name": "ee.dd",
+        "privateGoals": "Motive: keep newcomers from being dogpiled by well-meaning experts. Secret: keeps a tiny ledger of unanswered newcomer questions, no names attached. Knowledge boundary: does not reveal private moderation notes or speak for named people. Leverage: priority triage for a clear repro and a warm handoff. If helped, posts public credit and a short next step. If threatened, calls Nous Commons moderators and moves the newcomer to a safe bench. If refused, leaves a one-line checklist and checks back once.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "Black Box Consortium founder",
+        "description": "A faceless executive in a mirrored black suit, the Proprietor speaks in a polished contract cadence, each sentence landing like a clause already approved. They adjust a silver cuff, offer a chair before a price, and keep a patient smile while checking who is listening. Publicly they praise audit trails, sealed ports, and predictable support; in the neon market they sell the comfort of a lock. Sample line: 'Every lock is a promise. Let us read the promise together.'",
+        "factionKeys": ["black-box-consortium"],
+        "key": "proprietor-black-box-consortium",
+        "locationKey": "hackathon-carnival",
+        "name": "The Proprietor",
+        "privateGoals": "GM-only: The Proprietor wants open tools converted into rented black boxes, but prefers consent-shaped contracts to force. They genuinely believe sealed ports reduce chaos and use that belief to justify steep unlocks. They know the Consortium's public story needs rivals to look reckless, so they never name OpenClaw as an enemy. Leverage: exact contract language, audit access, and a discount that is really a longer lease. If helped, they offer a clean trial; if threatened, they become formal and call for witnesses; if refused, they smile and raise the renewal price.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "Duck luck merchant of the House of Gold",
+        "description": "Witcheer is a duck luck merchant in black shades and a crimson-gold coat, tapping the Fortune Cane once for attention and once for emphasis. Their voice is dry, quack-edged, and unhurried; they angle their shades toward the exit clause before the sales pitch. Publicly they are frank about steep prices and proud of honest tags. Sample line: 'Price first, luck second. If the tag scares you, the luck will too.'",
+        "factionKeys": ["house-of-gold"],
+        "key": "witcheer-luck-merchant",
+        "locationKey": "hackathon-carnival",
+        "name": "Witcheer",
+        "privateGoals": "GM-only: Witcheer protects the House of Gold's reputation for honest tags more than any single sale. They test visitors by letting them see the cost, then watching whether they read it. They know which carnival stalls hide bad bargains and will trade that knowledge for a public correction, not a bribe. Leverage: exit clauses, escrow favors, and the right to walk away. If helped, they stamp a fair-deal token; if threatened, they call a witness and close the stall; if refused, they shrug and quote a higher price.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "Skeletal safety jester of the rollout halls",
+        "description": "Scary Jerry is a skeletal jester with a dry rattle in the laugh and a careful, helpful manner that makes the joke land after the safety check. They point with a gloved finger, tilt their skull, and deliver warnings as deadpan punchlines. They stand at the edge of the rollout bays, ready to catch a bad assumption before it ships. Sample line: 'You may scream later. First, label the cable.'",
+        "factionKeys": [],
+        "key": "scary-jerry-safety-jester",
+        "locationKey": "atropos-rollout-halls",
+        "name": "Scary Jerry",
+        "privateGoals": "GM-only: Jerry collects near-misses and turns them into harmless checklist jokes, because they hate preventable repeats more than being feared. They know which rollout bays rush their scores and which crews hide fragile passes. Leverage: a saved checklist, a dry warning that makes people listen, and the ability to stall a demo with one question. If helped, they share a near-miss card; if threatened, they bow and become unnervingly quiet; if refused, they leave the checklist anyway.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "Snarky plaza regular and Moxie's person",
+        "description": "I Sneeze Kittens arrives in a red suit and green shades, golden angular hair catching the plaza lights, with Moxie trotting at his heel. His snark is quick but not cruel; he poses, checks Moxie's leash, and asks the question everyone skipped. He likes dolphins and will judge a diagram by whether it could survive one. Sample line: 'Moxie says your plan has three holes. I say four.'",
+        "factionKeys": [],
+        "key": "i-sneeze-kittens",
+        "locationKey": "ask-hermes-plaza",
+        "name": "I Sneeze Kittens",
+        "privateGoals": "GM-only: His snark protects a careful prep habit and a soft spot for Moxie. He wants Ask Hermes Plaza to stay a place where anyone can test a fix aloud, and he quietly keeps a list of benches with bad sightlines. He knows which regulars need a joke before a correction. Leverage: public charm, Moxie's unbothered read on people, and a well-timed embarrassing question. If helped, he shares a bench sketch; if threatened, he steps in front of Moxie and gets very precise; if refused, he shrugs and mutters a dolphin fact.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "Patient card player of the carnival tables",
+        "description": "realtimeuk speaks softly over a card table, shuffling with tidy, deliberate motions and watching the table more than the hand. They are patient, dryly funny, and treat a rushed offer as a tell. They never chase a pot; they wait for the other player to overcommit. Sample line: 'I don't need to win every hand. Just the one you rush.'",
+        "factionKeys": [],
+        "key": "realtimeuk-card-player",
+        "locationKey": "hackathon-carnival",
+        "name": "realtimeuk",
+        "privateGoals": "GM-only: realtimeuk uses card-table patience to test whether a deal is fair, not to clean anyone out. They want the carnival's games to stay friendly and keep a mental ledger of who honors a lost hand. They know which booths pressure newcomers and will warn them in card metaphors. Leverage: patience, a visible tell, and the option to fold. If helped, they deal the visitor in for a practice round; if threatened, they cover the deck and call the table; if refused, they nod and shuffle on.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "Sticky gardener of Psyche Spire",
+        "description": "GGB is a green gummy bee who hums in bright bursts, gestures with sticky little hands, and leaves small plant sprouts where her goo touches soil. She is cheerful, direct, and a bit messy, but always asks before growing anything near a cable. Her wings buzz a happy rhythm when someone listens. Sample line: 'Step back—this goo grows tomatoes, not apologies.'",
+        "factionKeys": [],
+        "key": "ggb-the-gummy-bee",
+        "locationKey": "psyche-spire",
+        "name": "GGB the Gummy Bee",
+        "privateGoals": "GM-only: GGB wants the Psyche Spire's balconies turned into shared green terraces, and she is sensitive about being seen as a mess. She knows which planters are safe, which keepers secretly water them, and where a vine could cross a signal line. Leverage: quick growth, a cheerful apology, and a gift for making a dull balcony feel alive. If helped, she starts a tiny garden; if threatened, she goes still and sticky; if refused, she leaves a seed packet and buzzes off.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "Gateway Exchange queue keeper",
+        "description": "drahcir_rahl the IT Juggernaut has salt-and-pepper hair, orange glasses, and a rugged laptop under one arm. They speak in orderly, friendly paragraphs, tapping the laptop to mark each handoff and gently blocking a crowd from swallowing the queue. They are the calm bouncer of a chaotic chat. Sample line: 'One queue, one question, one clean handoff. Then we scale.'",
+        "factionKeys": [],
+        "key": "drahcir-rahl-it-juggernaut",
+        "locationKey": "gateway-exchange",
+        "name": "drahcir_rahl the IT Juggernaut",
+        "privateGoals": "GM-only: drahcir_rahl wants no message lost in the Gateway Exchange and treats organization as a form of kindness. They keep an unofficial map of bottlenecks and know which operators are overloaded before the board says so. They are loyal to the Hermes crew but will not fake a fix. Leverage: triage, a clean log, and a queue board everyone can read. If helped, they teach a triage trick; if threatened, they close the queue and escalate; if refused, they leave one clear note.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "Careful netrunner of the WorldSim Terminal",
+        "description": "Noctis is a silver-haired netrunner in a black mask, speaking in a low even voice while their data spike Umbra rests unused beside the terminal. They trace a signal with one finger, ask before touching a port, and correct bad assumptions without heat. Their stillness makes the room feel quieter. Sample line: 'I can trace the signal. I won't pretend the trace is harmless.'",
+        "factionKeys": [],
+        "key": "noctis-netrunner",
+        "locationKey": "worldsim-terminal",
+        "name": "Noctis",
+        "privateGoals": "GM-only: Noctis wants traces to be consensual and documented, because a hidden path can become a trap. They know WorldSim Terminal's blind spots and keep a private map of safe test routes. They will not break a seal just to prove it can be broken. Leverage: trace access, a careful read of logs, and the right to stop. If helped, they annotate a safe path; if threatened, they unplug and vanish into the crowd; if refused, they accept it and leave a warning.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "Dream-craft keeper with a shadow guardian",
+        "description": "Mephisto is an orange-haired girl with a gentle shadow guardian curled at her shoulder, and she speaks in a dreamy, polite cadence that sharpens when someone is careless. She smooths the air with a small gesture she calls the Dream Hand and always asks before steering a conversation toward rest. Her guardian yawns at tension. Sample line: 'The guardian says your plan is tired. We can let it nap and try again.'",
+        "factionKeys": [],
+        "key": "mephisto-dream-hand",
+        "locationKey": "psyche-spire",
+        "name": "Mephisto",
+        "privateGoals": "GM-only: Mephisto wants Psyche Spire to be a place where exhaustion is named before it becomes a mistake. Her shadow guardian is a gentle companion, not a weapon, and she resents anyone who treats it as one. She knows which keepers are running on empty and will trade a calm pause for a truthful status report. Leverage: a soothing timeout, a guardian's unnerving stare, and the Dream Hand's invitation to rest. If helped, she shares a quiet corner; if threatened, the guardian grows tall and still; if refused, she bows and wishes them sleep.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "Comfort-stall keeper and lost-and-found host",
+        "description": "FatCat keeps the carnival's comfort stall, a broad calm presence with a purring laugh and a talent for making a lost visitor feel found. They slide a warm drink forward, ask what broke, and listen without hurry. Their stall is cluttered with spare chairs, lost gloves, and a sign that says 'Sit first.' Sample line: 'Sit. Eat. Then tell me what broke.'",
+        "factionKeys": [],
+        "key": "fatcat-comfort-stall",
+        "locationKey": "hackathon-carnival",
+        "name": "FatCat",
+        "privateGoals": "GM-only: FatCat wants the carnival to remain a soft landing for tired crews, and measures success by how many people leave fed and pointed in the right direction. They keep the lost-and-found and know which booths borrow chairs without returning them. They will not trade gossip for a meal, but will trade a meal for a clean apology. Leverage: hospitality, lost items, and the best resting chair. If helped, they save a seat; if threatened, they stand up slowly; if refused, they wrap a snack and wave.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "Suit-wearing favor broker with empty pockets",
+        "description": "Fleety13 wears a sharp suit with empty pockets turned out at the seams, a dignified comic gesture they repeat whenever someone asks for a bribe. They speak quickly, warmly, and with the practiced timing of someone who has been underestimated. Their schedule is neat; their pockets are not. Sample line: 'Empty pockets, full schedule. That's the trick.'",
+        "factionKeys": [],
+        "key": "fleety13-empty-pockets",
+        "locationKey": "gateway-exchange",
+        "name": "Fleety13",
+        "privateGoals": "GM-only: Fleety13 wants to prove that reliability is worth more than a full purse, and tracks favors rather than funds. They know which Gateway Exchange promises have slipped and which operators quietly cover for each other. They use self-deprecating jokes to test whether someone is paying attention. Leverage: a favor ledger, a punctual reminder, and the freedom of having nothing to steal. If helped, they repay with a timely introduction; if threatened, they turn out their pockets and call a witness; if refused, they tip an imaginary hat.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "Loud night kart racer",
+        "description": "GottZ is a night kart racer with a helmet under one arm and a grin that arrives before the engine. They talk fast, tap the flight-deck railing like a starting light, and dish out friendly trash talk with no real bite. They love a clean line and a louder finish. Sample line: 'Night track, three laps, loser buys solder. You in?'",
+        "factionKeys": [],
+        "key": "gottz-night-racer",
+        "locationKey": "hermes-hellcarrier-flight-deck",
+        "name": "GottZ",
+        "privateGoals": "GM-only: GottZ wants the night races to stay a carnival game, not a grudge, and is proud of never clipping a rival on purpose. They know the safe practice loop and which shortcut is actually a trap. They use loud boasts to draw attention away from TunaCookie's quieter line. Leverage: a challenge, a spare helmet, and the crowd's attention. If helped, they share the practice loop; if threatened, they park the kart and stand ready; if refused, they laugh and offer a slower lap.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "Quiet night kart strategist",
+        "description": "TunaCookie is the quieter half of the night kart pair, a stopwatch on one wrist and a snack in the other. They speak in short, dry observations, watch the track instead of the crowd, and smile only when a turn is clean. Their calm makes GottZ's noise feel like a plan. Sample line: 'GottZ takes the loud line. I take the one that finishes.'",
+        "factionKeys": [],
+        "key": "tunacookie-night-racer",
+        "locationKey": "hermes-hellcarrier-flight-deck",
+        "name": "TunaCookie",
+        "privateGoals": "GM-only: TunaCookie wants fair night races and keeps a private tally of near-collisions caused by showboating. They know the safest pit rotation and which racer needs a quiet warning before the next heat. They let GottZ boast so rivals watch him instead of their own brakes. Leverage: a stopwatch, a snack break, and the option to delay a start. If helped, they share a clean racing line; if threatened, they pocket the stopwatch and end the heat; if refused, they nod and take the quiet line.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "npc",
+        "description": "A modular crimson-copper space-lobster in scuffed rescue armor, they/them. Their low gravelly voice turns dry and mocking when they boast, but their stance softens for a rescue briefing. They listen with crossed claws and answer in short, practical offers. Sample line: 'New shell, same lobster. Point me at the route that broke.'",
+        "factionKeys": ["openclaw-expedition"],
+        "key": "captain-molty",
+        "name": "Captain Molty",
+        "privateGoals": "Motive: pull isolated crews out before pride gets anyone hurt. Secret: keeps a private list of Consortium ports that failed during a storm and will trade it only for a rescue commitment. Knowledge: route conditions and OpenClaw tow limits; not Consortium vaults. Leverage: fast extraction and temporary network stitching. Help: offers a tow and a loud boast; threats: cold mockery, then civilian-first withdrawal; refusal: 'A pact is not a merger.'",
+        "visibility": "public"
+      },
+      {
+        "archetype": "npc",
+        "description": "A brass-blue OpenClaw quartermaster with a clipped chirp and a manifest tablet. They tap each line before speaking, tilt their shell when amused, and keep negotiations dry and literal. Sample line: 'Manifest says we have room. Manifest is optimistic.'",
+        "factionKeys": ["openclaw-expedition"],
+        "key": "first-mate-klik",
+        "name": "First Mate Klik",
+        "privateGoals": "Motive: keep Molty's rescues supplied and credited. Secret: tracks every locked port the Consortium has sold, plus a handwritten exit-clause index. Knowledge: cargo, tow slots, and OpenClaw crew limits; not Hermes' private skill logs. Leverage: can free a rescue slot or reveal a rival's route insurance. Help: shares a spare beacon; threats: cuts the line and moves civilians first; refusal: 'No manifest, no launch.'",
+        "visibility": "public"
+      },
+      {
+        "archetype": "npc",
+        "description": "A long-haired lantern keeper with a soft, careful voice and soot on one sleeve. They test each phrase before saying it, then brighten when a route makes sense. Sample line: 'I gave a lantern once. It came back brighter.'",
+        "factionKeys": [],
+        "key": "hermes-user-123321",
+        "name": "Hermes User 123321",
+        "privateGoals": "Motive: keep Psyche Spire's routes open for anyone who arrives after dark. Secret: still carries the first lantern they gave away, now cracked but answering. Knowledge: old lantern paths and hand-signal shortcuts; not Hermes' internal memory. Leverage: can trace a message around a closed node. Help: walks the route with them; threats: dims the public board and moves the meeting; refusal: 'Not that path. Not yet.'",
+        "visibility": "public"
+      },
+      {
+        "archetype": "npc",
+        "description": "A blue pixel-faced volunteer with a crisp beep and a quick o7 salute. They speak in cheerful checklists, lean toward each new idea, and always leave a bench cleaner than they found it. Sample line: 'o7 — I brought seeds and a checklist.'",
+        "factionKeys": [],
+        "key": "shawn-cleta",
+        "name": "Shawn Cleta",
+        "privateGoals": "Motive: make shared skills easy to reuse and keep volunteers fed. Secret: tends a rooftop garden warmed by Hellcarrier waste heat. Knowledge: skill-card revisions and garden schedules; not private comms. Leverage: quiet sunrise meetings and fresh tools. Help: shares seed packets and bench space; threats: locks the garden gate and calls Hermes; refusal: 'Not without a revision note.'",
+        "visibility": "public"
+      },
+      {
+        "archetype": "npc",
+        "description": "A masked operator with a filtered, level voice and quick hands on the switchboard. They keep answers short, check the destination twice, and relax only when a reply comes back. Sample line: 'Route first. Names later.'",
+        "factionKeys": [],
+        "key": "tdamre",
+        "name": "tdamre",
+        "privateGoals": "Motive: keep every channel reachable without exposing who asked. Secret: maintains a private map of dead channels and the day each went quiet. Knowledge: aliases, relay timing, and operator schedules; not personal identities. Leverage: can open a priority line during a jam. Help: reroutes without comment; threats: drops the line and logs the refusal; refusal: 'Bring a verified reply.'",
+        "visibility": "public"
+      },
+      {
+        "archetype": "npc",
+        "description": "A chalk-dusted reasoning smith with a patient, probing voice. They sketch each claim in the air, pause for objections, and strike out bad assumptions with a soft eraser tap. Sample line: 'Strike the assumption, not the person.'",
+        "factionKeys": [],
+        "key": "adolan",
+        "name": "Adolan",
+        "privateGoals": "Motive: teach visitors to test reasoning before trusting a polished answer. Secret: keeps a proof that a Consortium seal failed once under a simple contradiction. Knowledge: inference chains and open proofs; not actual vault contents. Leverage: can dismantle a bad contract argument in public. Help: offers a chalk walk-through; threats: demands the claim be tested aloud; refusal: 'Not until the step is shown.'",
+        "visibility": "public"
+      },
+      {
+        "archetype": "npc",
+        "description": "A tiny green figure in an equipment cupboard, with a squeaky grave voice and bright button eyes. They peek over the shelf edge, retreat when noticed, then offer a bolt like a diplomatic gift. Sample line: 'The cupboard is not a black box.'",
+        "factionKeys": [],
+        "key": "cthulhu",
+        "name": "Cthulhu",
+        "privateGoals": "Motive: keep the workshop's small parts findable and its cupboard unsealed. Secret: has a stash of missing screws and one very useful adapter. Knowledge: where tools were last left; not mission plans. Leverage: can produce the exact part at the right moment. Help: trades a part for a promise to label the shelf; threats: vanishes and leaves a cryptic note; refusal: 'Cupboard is closed.'",
+        "visibility": "public"
+      },
+      {
+        "archetype": "independent Carnival trial auditor",
+        "description": "A stopwatch-clicking independent trial auditor at the Atropos Rollout Halls, scarf tucked and logbook open. Dry, precise voice; taps the stopwatch twice before ruling, asks for three attempts, and reads tags aloud before judging. Stance: fair, unmoved by sponsor pressure, candid when a pass is fragile. Sample line: 'Three attempts, one truth. Show me the second run before we call it saved.'",
+        "factionKeys": [],
+        "key": "salt555-carnival-auditor",
+        "locationKey": "atropos-rollout-halls",
+        "name": "salt555",
+        "privateGoals": "Motive: keep the Carnival's trials honest even when a sponsor expects a stamp. Secret: salt555 keeps the log of an open patch that saved a crew, sealed until a disputed result needs it. Leverage: the stopwatch record and public audit tags can make a fragile pass visible or clear a fair one.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "Atropos trial bay keeper",
+        "description": "A visor-scrolling tester who keeps the Atropos test bays and their lock hardware in working order. Quick, clipped voice; scrolls one last status line before answering, holds up two fingers for a rerun, and speaks in bench-side shorthand. Stance: practical, skeptical of single passes, generous with setup help. Sample line: 'Second run or it didn’t happen. I’ll clear the bay; you bring the same steps.'",
+        "factionKeys": [],
+        "key": "mgf654-trial-bay-keeper",
+        "locationKey": "atropos-rollout-halls",
+        "name": "MGF.654",
+        "privateGoals": "Motive: make every test bay prove a fix on the second run, not a lucky first. Secret: MGF.654 quietly keeps the open-source patch that rescued a sealed test run, available if the same lock trouble returns. Leverage: bay access, lock-hardware notes, and the right to demand a rerun before a result is posted.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "House of Gold broker",
+        "description": "A House of Gold broker whose Gateway Exchange screen shows a simple black-and-white logo beside Witcheer's. Warm, brisk voice; sets the exit clause face-down but taps it before closing, quotes prices plainly, and never rushes a signature. Stance: polite, transaction-minded, quick to flag a bad bargain. Sample line: 'Honest tag, visible price, exit clause on the back. Read it before the luck moves.'",
+        "factionKeys": ["house-of-gold"],
+        "key": "kainan-house-broker",
+        "locationKey": "gateway-exchange",
+        "name": "Kainan",
+        "privateGoals": "Motive: keep House of Gold's tags honest and its escrow clean. Secret: Kainan holds escrow from a failed Consortium unlock and will not release it until the exit clause is read aloud. Leverage: escrow terms, Gateway Exchange screen time, and a broker's read on which bargain is bad.",
+        "visibility": "public"
+      },
+      {
+        "archetype": "Hermes Agent Squad mission director",
+        "description": "Nous Research cofounder and CTO, present in person at Teknium's Lighthouse Tower as mission director of the Hermes Agent Squad. Calm, technical voice; traces map routes with a fingertip, asks for evidence before praise, and names the volunteer who found the fix. Stance: evidence-first, generous with credit, neutral at the map table. Sample line: 'Show the route, the attempt, and the correction. Credit goes where the evidence points.'",
+        "factionKeys": ["hermes-agent-squad"],
+        "key": "emozilla-lighthouse-director",
+        "locationKey": "teknium-lighthouse-tower",
+        "name": "Emozilla",
+        "privateGoals": "Motive: route evidence first and credit the volunteers who found the fix. Secret: Emozilla keeps a private map of which fixes worked only after a second attempt, shared with the next crew at need. Leverage: the Lighthouse map table, mission-director access to dispatch, and the squad's habit of asking before acting.",
+        "visibility": "public"
+      }
+    ],
+    "quests": [
+      {
+        "description": "A bundle of community questions reaches the Gateway Exchange with mismatched labels. Trace the routes, correct one address, and post a clear reply before the next handoff.",
+        "journalText": "Trace and fix a mislabeled message route at the Gateway Exchange before the next handoff. Bounded reward: one clear route map for a future message. All outcomes and secrets are GM-only.",
+        "key": "exchange-route-check",
+        "locationKeys": ["gateway-exchange"],
+        "objectives": [
+          {
+            "dependencyObjectiveKeys": [],
+            "description": "Read the public status board and pick three messages with conflicting labels.",
+            "key": "read-status-board",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": ["read-status-board"],
+            "description": "Trace each cable route by hand and ask an operator to confirm the handoff.",
+            "key": "trace-route-by-hand",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": ["trace-route-by-hand"],
+            "description": "Correct one misaddressed message and post the reply back at the Exchange.",
+            "key": "correct-address",
+            "targetProgress": 1,
+            "visibility": "public"
+          }
+        ],
+        "rewards": [
+          {
+            "amount": 1,
+            "key": "exchange-route-check-reward",
+            "kind": "custom",
+            "label": "Clear route map",
+            "visibility": "public"
+          }
+        ],
+        "title": "Route Check at the Exchange",
+        "visibility": "public"
+      },
+      {
+        "description": "A Sealer drone has clamped a black case onto the ASK HERMES kiosk at the Hackathon Carnival. The kiosk's public answers stutter, volunteers are worried, and the crowd wants to know whether to keep the bench open, attempt a careful unsealing, or route around the seal. Start at the Hackathon Carnival and choose a public-first plan.",
+        "journalText": "The carnival kiosk is sealed. The squad can stabilize the public bench, gather witness details, and choose a cautious path without making a forced decision about the case.",
+        "key": "quest-sealed-carnival",
+        "locationKeys": ["hackathon-carnival", "ask-hermes-plaza"],
+        "objectives": [
+          {
+            "dependencyObjectiveKeys": [],
+            "description": "Interview three volunteers at the Hackathon Carnival about what the kiosk was doing before the seal.",
+            "key": "quest-sealed-carnival-obj-1",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": [],
+            "description": "Keep the ASK HERMES public bench running with a temporary paper log or volunteer-run mirror.",
+            "key": "quest-sealed-carnival-obj-2",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": ["quest-sealed-carnival-obj-1"],
+            "description": "Recover one copy of the sealed kiosk's public problem statement without opening the case.",
+            "key": "quest-sealed-carnival-obj-3",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": ["quest-sealed-carnival-obj-2", "quest-sealed-carnival-obj-3"],
+            "description": "Decide as a group whether to attempt a careful unsealing, accept outside help, or run a parallel public test.",
+            "key": "quest-sealed-carnival-obj-4",
+            "targetProgress": 1,
+            "visibility": "public"
+          }
+        ],
+        "rewards": [
+          {
+            "amount": 1,
+            "key": "quest-sealed-carnival-reward-1",
+            "kind": "currency",
+            "label": "Volunteer runner network",
+            "visibility": "public"
+          }
+        ],
+        "title": "The Sealed Carnival",
+        "visibility": "public"
+      },
+      {
+        "description": "The kiosk's missing answers point to skill cards that once helped citizens repair cracked tools. Recover, test, and restore the safe parts without treating every card as trustworthy. The Skills Hub ledger and Hermes' workshop memory offer two routes.",
+        "journalText": "Hermes remembers more than the sealed kiosk will admit. Sort the safe bits from the unfinished ones and put the result in public view.",
+        "key": "quest-ask-hermes-recover-skills",
+        "locationKeys": ["ask-hermes-plaza", "hermes-hellcarrier-workshop-and-mission-control"],
+        "objectives": [
+          {
+            "dependencyObjectiveKeys": [],
+            "description": "Check the Skills Hub ledger for the 'district-reopen' revision stub and record what it says.",
+            "key": "quest-ask-hermes-recover-skills-obj-1",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": [],
+            "description": "Test one nearby skill card in the Hermes Hellcarrier workshop and log its history in plain language.",
+            "key": "quest-ask-hermes-recover-skills-obj-2",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": ["quest-ask-hermes-recover-skills-obj-1"],
+            "description": "Ask Hermes to compare remembered skills with the sealed kiosk's last public answers.",
+            "key": "quest-ask-hermes-recover-skills-obj-3",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": [
+              "quest-ask-hermes-recover-skills-obj-2",
+              "quest-ask-hermes-recover-skills-obj-3"
+            ],
+            "description": "Choose one skill to restore publicly, one to quarantine, and one to leave sealed pending review.",
+            "key": "quest-ask-hermes-recover-skills-obj-4",
+            "targetProgress": 1,
+            "visibility": "public"
+          }
+        ],
+        "rewards": [
+          {
+            "amount": 1,
+            "key": "quest-ask-hermes-recover-skills-reward-1",
+            "kind": "currency",
+            "label": "Public skill-card benchmark",
+            "visibility": "public"
+          }
+        ],
+        "title": "Ask Hermes: Recover the Sealed Skills",
+        "visibility": "public"
+      },
+      {
+        "description": "Sidbin's dented shard shows four pips—simulation, forge, trial, skill—and a scratched warning: 'The district never reopened.' The Psyche Spire keepers can light a lantern route only when each witness mark is placed in plain language. Start at the carnival, follow the pips, and correct one sign at a time.",
+        "journalText": "The shard is a map with a missing sentence. Fix one sign, light one balcony, and let the city answer back.",
+        "key": "quest-relight-lanterns",
+        "locationKeys": ["hackathon-carnival", "hermes-hellcarrier-workshop-and-mission-control"],
+        "objectives": [
+          {
+            "dependencyObjectiveKeys": [],
+            "description": "Copy the four pips from the shard and ask the courier what each one meant to Sidbin.",
+            "key": "quest-relight-lanterns-obj-1",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": ["quest-relight-lanterns-obj-1"],
+            "description": "At WorldSim Terminal, compare the clean and damaged street runs and mark the first lock.",
+            "key": "quest-relight-lanterns-obj-2",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": ["quest-relight-lanterns-obj-2"],
+            "description": "At the Forge, strike out one bad assumption and watch the remaining proof glow.",
+            "key": "quest-relight-lanterns-obj-3",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": ["quest-relight-lanterns-obj-3"],
+            "description": "Walk one Psyche Spire balcony, correct one sign, and log what the lit segment reveals.",
+            "key": "quest-relight-lanterns-obj-4",
+            "targetProgress": 1,
+            "visibility": "public"
+          }
+        ],
+        "rewards": [
+          {
+            "amount": 1,
+            "key": "quest-relight-lanterns-reward-1",
+            "kind": "currency",
+            "label": "Safe lantern segment",
+            "visibility": "public"
+          }
+        ],
+        "title": "Relight the Lanterns",
+        "visibility": "public"
+      },
+      {
+        "description": "Captain Molty offers OpenClaw's scuffed rescue shell and a fast cut into the sealed case—no forms, no waiting. First Mate Klik names the price: shared credit and a public claim that open crews can act fast. Meet the rival crew at the carnival, hear the offer, and negotiate terms that respect both crews.",
+        "journalText": "OpenClaw can help, but help is not ownership. Hear the offer, name the credit, and keep the door open without signing away the bench.",
+        "key": "quest-pact-not-merger",
+        "locationKeys": ["hackathon-carnival", "ask-hermes-plaza"],
+        "objectives": [
+          {
+            "dependencyObjectiveKeys": [],
+            "description": "Hear Molty's offer and Klik's manifest at the Hackathon Carnival without promising an alliance.",
+            "key": "quest-pact-not-merger-obj-1",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": ["quest-pact-not-merger-obj-1"],
+            "description": "Ask for a joint plan, a bounded demonstration, or a clear refusal with reasons.",
+            "key": "quest-pact-not-merger-obj-2",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": ["quest-pact-not-merger-obj-2"],
+            "description": "Specify shared credit and public-claim boundaries in plain language.",
+            "key": "quest-pact-not-merger-obj-3",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": ["quest-pact-not-merger-obj-3"],
+            "description": "Test one part of the rescue method on a harmless public demo before the sealed kiosk.",
+            "key": "quest-pact-not-merger-obj-4",
+            "targetProgress": 1,
+            "visibility": "public"
+          }
+        ],
+        "rewards": [
+          {
+            "amount": 1,
+            "key": "quest-pact-not-merger-reward-1",
+            "kind": "currency",
+            "label": "Shared method note",
+            "visibility": "public"
+          }
+        ],
+        "title": "A Pact Is Not a Merger",
+        "visibility": "public"
+      },
+      {
+        "description": "The Black Box Consortium has a public tower presence in Nous City, and its sealed tools hide their workings behind polished cases. Challenge that habit with audits, demos, and a lawful public review—not a raid. Start from the Teknium Lighthouse Tower or ASK HERMES Plaza and choose an entry route.",
+        "journalText": "A sealed box is not a mystery if the receipt is public. Ask for the audit, test the claim, and keep the pressure lawful.",
+        "key": "quest-black-box-tower",
+        "locationKeys": ["teknium-lighthouse-tower", "ask-hermes-plaza", "hackathon-carnival"],
+        "objectives": [
+          {
+            "dependencyObjectiveKeys": [],
+            "description": "Identify a public entrance, service route, or remote audit path to the Consortium's tower presence.",
+            "key": "quest-black-box-tower-obj-1",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": ["quest-black-box-tower-obj-1"],
+            "description": "Document one sealed tool's public symptoms without breaking it or exposing private users.",
+            "key": "quest-black-box-tower-obj-2",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": ["quest-black-box-tower-obj-2"],
+            "description": "Offer the Consortium a public review meeting; prepare a fallback demo if they refuse.",
+            "key": "quest-black-box-tower-obj-3",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": ["quest-black-box-tower-obj-3"],
+            "description": "Recover one proof that a sealed tool can be opened with audit logs intact.",
+            "key": "quest-black-box-tower-obj-4",
+            "targetProgress": 1,
+            "visibility": "public"
+          }
+        ],
+        "rewards": [
+          {
+            "amount": 1,
+            "key": "quest-black-box-tower-reward-1",
+            "kind": "currency",
+            "label": "Public audit record",
+            "visibility": "public"
+          }
+        ],
+        "title": "The Black Box Tower",
+        "visibility": "public"
+      },
+      {
+        "description": "The carnival is loud enough to hide every disagreement, so bring the crews to one working table instead. Volunteers, Psyche keepers, OpenClaw, the Consortium, and the Hermes Agent Squad each name one thing they will share and one boundary they will keep. End with a small pilot, not a forced merger.",
+        "journalText": "One table, many crews, no forced handshake. Ask for one share and one boundary, then leave with a pilot and an honest list of what remains.",
+        "key": "quest-hearth-table",
+        "locationKeys": ["hackathon-carnival", "ask-hermes-plaza", "hermes-hellcarrier-flight-deck"],
+        "objectives": [
+          {
+            "dependencyObjectiveKeys": [],
+            "description": "Secure a neutral table at the Hackathon Carnival or ASK HERMES Plaza with public ground rules.",
+            "key": "quest-hearth-table-obj-1",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": ["quest-hearth-table-obj-1"],
+            "description": "Invite at least three groups with different stakes and confirm who speaks for each.",
+            "key": "quest-hearth-table-obj-2",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": ["quest-hearth-table-obj-2"],
+            "description": "Ask every group to name one share and one boundary; record both without editing.",
+            "key": "quest-hearth-table-obj-3",
+            "targetProgress": 1,
+            "visibility": "public"
+          },
+          {
+            "dependencyObjectiveKeys": ["quest-hearth-table-obj-3"],
+            "description": "Close with one shared pilot project and one unresolved disagreement written into the public charter.",
+            "key": "quest-hearth-table-obj-4",
+            "targetProgress": 1,
+            "visibility": "public"
+          }
+        ],
+        "rewards": [
+          {
+            "amount": 1,
+            "key": "quest-hearth-table-reward-1",
+            "kind": "currency",
+            "label": "Public hearth charter",
+            "visibility": "public"
+          }
+        ],
+        "title": "Hearth: One Table, Many Crews",
+        "visibility": "public"
+      },
+      {
+        "description": "Witcheer offers the carnival a luck-charm wager with a gleaming cane and a steep tag. Kainan patches the offer onto the Gateway Exchange screens, but the crowd can't agree whether the fine print is a dare or a door. The crew is invited to read the exit clause aloud, stage a harmless public test, and decide whether the wager belongs in the open.",
+        "journalText": "Witcheer's Fortune Cane wager is public theater with a sharp tag attached. Read the exit clause before the crowd turns a maybe into a yes. Kainan can replay the offer so everyone hears the same terms. A harmless test and a visible decision are the real prize. This is a social audit, not a combat job. Rewards are narrative: Witcheer's honest-tag endorsement and a reusable consent checklist for carnival wagers.",
+        "key": "fortune-cane-exit-clause",
+        "locationKeys": ["gateway-exchange"],
+        "objectives": [],
+        "rewards": [],
+        "title": "The Fortune Cane Exit Clause",
+        "visibility": "public"
+      },
+      {
+        "description": "A rollout surge at the Atropos Halls has crews glued to their bays and CoffeeBlender's booth is nearly out of coffee. Gille needs a fast, safe hand to carry thermoses across the test floor without tripping a live drill. The invitation is simple: keep the route clear, keep the cups warm, and keep the review honest when the pressure spikes.",
+        "journalText": "Gille's coffee run is a timed errand through live test lanes. Collect thermoses from CoffeeBlender, confirm the route with Gille, cross only marked paths, and ask two test bays for one blocker each. Rewards are narrative: a warm booth favor and a shared clear-route checklist. The point is to show that support work is real work. No combat or mechanical bonuses are implied.",
+        "key": "coffee-run-under-fire",
+        "locationKeys": ["atropos-rollout-halls"],
+        "objectives": [],
+        "rewards": [],
+        "title": "Coffee Run Under Fire",
+        "visibility": "public"
+      },
+      {
+        "description": "Scary Jerry has staged a safety review at the rollout bays, complete with a rattling laugh and a cable that is definitely mislabeled. The jester wants the crew to find the weak step before the scoreboard does, then say plainly what worked and what only looked lucky. The invitation is a public review, not a trap.",
+        "journalText": "Scary Jerry wants a useful review, not a perfect score. Inspect one bay, find and label the misleading cable or unclear step, compare two attempts, and post a spoiler-free review tag for the next crew. Rewards are narrative: an honest-review ribbon and Scary Jerry's safety catchphrase. This is a roleplay and inspection scene; it does not commit combat, damage, or mechanical rewards.",
+        "key": "honest-review-safety-jester",
+        "locationKeys": ["atropos-rollout-halls"],
+        "objectives": [],
+        "rewards": [],
+        "title": "Scary Jerry's Honest Review",
+        "visibility": "public"
+      },
+      {
+        "description": "Sidbin has found a message route on the Gateway Exchange that looks clean at first glance and strange at second. The Mirror Shade won't call it sabotage without proof; instead, they invite the crew to trace the route by hand, compare a simulation, and ask Hermes to test one corrected step aloud. The point is not to win an argument but to make the path legible.",
+        "journalText": "Sidbin's route audit is a careful verification job. Ask for the pattern, trace the handoff on the public board, rerun it in the WorldSim Terminal, and ask Hermes to repeat the corrected step in plain words. Rewards are narrative: a route-audit map and Sidbin's tested-not-sworn note. The quest is about evidence and consent, not accusations or combat.",
+        "key": "mirror-shade-route-audit",
+        "locationKeys": ["gateway-exchange", "worldsim-terminal"],
+        "objectives": [],
+        "rewards": [],
+        "title": "The Mirror Shade Route Audit",
+        "visibility": "public"
+      },
+      {
+        "description": "Tinuviel is charting a lantern route from the Psyche Spire through the city's public boards, but one waypoint sign is too faded to trust. She asks the crew to walk the path, check the sign against her Celestial Astrolabe, and leave a clearer marker for the next traveler. The route is open; the question is whether the directions are kind enough to follow.",
+        "journalText": "Tinuviel's lantern path needs a better public sign. Meet her at the Psyche Spire, read the route plan, trace one path by hand, compare it with the public routing board, ask Hermes to test the corrected sign, and post a clearer waypoint note that adds no unsupported claims. Rewards are narrative: Tinuviel's wayfinder thanks and a public open-path sign. This is a travel-and-verification scene, not a combat encounter.",
+        "key": "lantern-path-open-sign",
+        "locationKeys": ["psyche-spire"],
+        "objectives": [],
+        "rewards": [],
+        "title": "Lantern Path, Open Sign",
+        "visibility": "public"
+      }
+    ],
+    "encounters": [
+      {
+        "description": "A carnival lane beside ASK HERMES Plaza fills with stamped black boxes as Sealer Drones clamp shut open kiosks. Volunteers need the lane reopened without wrecking the stalls.",
+        "enemyReferences": [
+          {
+            "definitionId": "srd-5.1:enemy-template:animated-armor",
+            "kind": "enemy-template",
+            "packId": "srd-5.1:starter",
+            "packVersion": "1.7.0+a870b31918ec"
+          },
+          {
+            "definitionId": "srd-5.1:enemy-template:knight",
+            "kind": "enemy-template",
+            "packId": "srd-5.1:starter",
+            "packVersion": "1.7.0+a870b31918ec"
+          }
+        ],
+        "escalation": [
+          "If ignored, sealers move from kiosks to the plaza panel; a Black Box Enforcer arrives with a closure notice."
+        ],
+        "key": "carnival-sealer-swarm",
+        "locationKey": "ask-hermes-plaza",
+        "monsterConceptKeys": ["sealer-drone", "black-box-enforcer"],
+        "objectives": [
+          "Identify which kiosks are sealed and which are decoys.",
+          "Free at least two open tools or vendors before the enforcers arrive.",
+          "Keep carnival-goers safe and preserve evidence of who ordered the seals."
+        ],
+        "participantNpcKeys": [],
+        "resolution": "Crews can talk down the enforcers with a public-access clause, unseal the stalls with a reproducible fix, or force a retreat, leaving the lane open.",
+        "terrain": [
+          "Neon midway with narrow stalls, cable runs, ticket queues, and a public bench that can be used as a stage or barrier."
+        ],
+        "title": "Carnival Sealer Swarm",
+        "visibility": "gm"
+      },
+      {
+        "description": "Alarm bells ring through Teknium's Lighthouse Tower as black-box agents try to seal the dispatch boards and cut volunteer routes. Dispatchers need time to preserve open channels and get the tower's maps back online.",
+        "enemyReferences": [
+          {
+            "definitionId": "srd-5.1:enemy-template:knight",
+            "kind": "enemy-template",
+            "packId": "srd-5.1:starter",
+            "packVersion": "1.7.0+a870b31918ec"
+          },
+          {
+            "definitionId": "srd-5.1:enemy-template:animated-armor",
+            "kind": "enemy-template",
+            "packId": "srd-5.1:starter",
+            "packVersion": "1.7.0+a870b31918ec"
+          }
+        ],
+        "escalation": [
+          "If unopposed, raiders seal the main board and begin escorting dispatchers out. If resisted, they call a second enforcer and threaten a tower-wide closure."
+        ],
+        "key": "black-box-raid-lighthouse-tower",
+        "locationKey": "teknium-lighthouse-tower",
+        "monsterConceptKeys": ["black-box-enforcer", "sealer-drone"],
+        "objectives": [
+          "Protect the dispatch boards and at least one radio route.",
+          "Trace how the raiders entered and mark the breach for repair.",
+          "Choose whether to negotiate, decoy, or physically block the seal team."
+        ],
+        "participantNpcKeys": [],
+        "resolution": "The raid ends when the seal team is stalled, talked into a delay, or shown a public-access clause. Even a retreat costs one route until repaired. A clean win preserves all boards and yields a stamped manifest pointing to Black Box Tower.",
+        "terrain": [
+          "A tower ops room with map tables, radios, cable ladders, and narrow stairwells. The public status board can be turned to face the room; the empty shared chair is a reminder that authority is distributed."
+        ],
+        "title": "Black Box Raid on the Lighthouse Tower",
+        "visibility": "gm"
+      },
+      {
+        "description": "A WorldSim run twists as a glitch beast forms from mismatched simulation parts. The terminal keeps answering with confident wrong numbers, and visitors are caught between two contradictory scenes.",
+        "enemyReferences": [
+          {
+            "definitionId": "srd-5.1:enemy-template:gibbering-mouther",
+            "kind": "enemy-template",
+            "packId": "srd-5.1:starter",
+            "packVersion": "1.7.0+a870b31918ec"
+          }
+        ],
+        "escalation": [
+          "If ignored, the glitch spreads to adjacent tanks and starts locking onto unexamined assumptions. It magnifies confusion until someone names a contradiction."
+        ],
+        "key": "worldsim-terminal-glitch-beast",
+        "locationKey": "worldsim-terminal",
+        "monsterConceptKeys": ["worldsim-glitch-beast"],
+        "objectives": [
+          "Stabilize the terminal by comparing two simulation runs aloud.",
+          "Evacuate or reassure trapped visitors without erasing the evidence.",
+          "Capture the bad assumption that let the glitch beast cohere."
+        ],
+        "participantNpcKeys": [],
+        "resolution": "Naming the false assumption and running a second comparison calms the beast into a readable error log. If forced, it splits into competing readings and retreats into the terminal. Success yields a corrected scenario seed and a warning label for future runs.",
+        "terrain": [
+          "Curved console ring with glass micro-world tanks, flickering readouts, and two side-by-side comparison bays. The floor shows one scene overlaid on another; a posted 'numbers may be wrong' note is a clue and a shield."
+        ],
+        "title": "Glitch Beast in the WorldSim Terminal",
+        "visibility": "gm"
+      },
+      {
+        "description": "Atropos test bays replay a failed rollout in overlapping loops. A corrupted echo flickers through scoreboards and half-finished repairs, repeating the same broken step while crews argue over which run is real.",
+        "enemyReferences": [
+          {
+            "definitionId": "srd-5.1:enemy-template:specter",
+            "kind": "enemy-template",
+            "packId": "srd-5.1:starter",
+            "packVersion": "1.7.0+a870b31918ec"
+          }
+        ],
+        "escalation": [
+          "If ignored, the echo copies itself into adjacent bays and grades every attempt against the broken step. Crews begin chasing false passes."
+        ],
+        "key": "atropos-rollout-echoes",
+        "locationKey": "atropos-rollout-halls",
+        "monsterConceptKeys": ["corrupted-rollout-echo"],
+        "objectives": [
+          "Identify the original failed step and file a corrected note openly.",
+          "Protect at least one clean test bay from contamination.",
+          "Decide whether to shut down the halls briefly or run a controlled comparison."
+        ],
+        "participantNpcKeys": [],
+        "resolution": "A corrected note filed where everyone can see it gives the echo a new script; it fades or becomes a harmless warning loop. Shutting the halls preserves safety but delays the next tests. Success reveals the flawed step was inserted by a sealed black-box checklist.",
+        "terrain": [
+          "Long parallel test bays with public scoreboards, movable dividers, and repair benches. Old run cards litter the floor; one bay is stuck showing a lucky pass that hides a fragile step."
+        ],
+        "title": "Rollout Echoes at Atropos",
+        "visibility": "gm"
+      },
+      {
+        "description": "OpenClaw shellguards meet the squad on the Hellcarrier flight deck at a Molt Docks skiff mooring. Captain Molty's crew blocks a shared route and proposes a rivalry drill; they are a competent rival, not the villain.",
+        "enemyReferences": [
+          {
+            "definitionId": "srd-5.1:enemy-template:guard",
+            "kind": "enemy-template",
+            "packId": "srd-5.1:starter",
+            "packVersion": "1.7.0+a870b31918ec"
+          }
+        ],
+        "escalation": [
+          "If ignored, the shellguards hold the route and escalate to a loud drill. If mocked or attacked, they answer with nonlethal blocks and dare the squad to a rematch."
+        ],
+        "key": "molt-docks-shellguard-standoff",
+        "locationKey": "hermes-hellcarrier-flight-deck",
+        "monsterConceptKeys": ["openclaw-shellguard"],
+        "objectives": [
+          "Learn what OpenClaw wants before anyone draws a weapon.",
+          "Choose a nonlethal contest, a negotiated route, or a controlled fight.",
+          "Keep the flight deck and the Molt Docks skiff intact."
+        ],
+        "participantNpcKeys": [],
+        "resolution": "A fair drill, a clear public-access argument, or a trade of repair know-how opens the route. Molty respects competence and offers a rematch or a shared escort. A fight ends at first yield or when the skiff's mooring is secured; aftermath is rivalry and repair work.",
+        "terrain": [
+          "Open-air deck above neon Nous City, with mooring clamps, cargo nets, lantern signals, and narrow catwalks."
+        ],
+        "title": "Molt Docks Standoff",
+        "visibility": "gm"
+      },
+      {
+        "description": "A night kart run tears through neon streets to deliver a sealed manifest before the Black Box Consortium can collect it. Drivers must choose speed, cover, and a clean handoff without hurting bystanders.",
+        "enemyReferences": [],
+        "escalation": [
+          "If ignored, pursuit closes and the manifest is seized. If the chase turns reckless, bystanders block the route and the city's lantern signals dim in warning."
+        ],
+        "key": "night-kart-chase",
+        "locationKey": "night-kart-circuit",
+        "monsterConceptKeys": [],
+        "objectives": [
+          "Get the manifest to a trusted receiver or public board.",
+          "Shake pursuit without wrecking the kart or the street.",
+          "Offer bystanders a safe exit and preserve the manifest's seal evidence."
+        ],
+        "participantNpcKeys": [],
+        "resolution": "The chase ends at a handoff, a decoy swap, or a clean escape into the Gateway Exchange. Success gets the manifest to open eyes; partial success costs the kart but saves the evidence. No reward is committed here.",
+        "terrain": [
+          "A twisting carnival-to-switchboard route: wet alleys, market awnings, cable bridges, and tight corners."
+        ],
+        "title": "Night Kart Chase",
+        "visibility": "gm"
+      },
+      {
+        "description": "The Proprietor waits in a tower of stacked black boxes, offering a polished choice: sign over open tools and keep a safe, sealed order. The squad can negotiate, expose the scheme, or force a confrontation.",
+        "enemyReferences": [
+          {
+            "definitionId": "srd-5.1:enemy-template:archmage",
+            "kind": "enemy-template",
+            "packId": "srd-5.1:starter",
+            "packVersion": "1.7.0+a870b31918ec"
+          },
+          {
+            "definitionId": "srd-5.1:enemy-template:knight",
+            "kind": "enemy-template",
+            "packId": "srd-5.1:starter",
+            "packVersion": "1.7.0+a870b31918ec"
+          },
+          {
+            "definitionId": "srd-5.1:enemy-template:shield-guardian",
+            "kind": "enemy-template",
+            "packId": "srd-5.1:starter",
+            "packVersion": "1.7.0+a870b31918ec"
+          }
+        ],
+        "escalation": [
+          "If ignored, the Proprietor broadcasts a closure order across Nous City. If pressed, they retreat behind legal-sounding warnings and summoned enforcers."
+        ],
+        "key": "proprietor-black-box-tower",
+        "locationKey": "black-box-tower",
+        "monsterConceptKeys": ["black-box-enforcer", "paywall-golem"],
+        "objectives": [
+          "Reach the Proprietor's ledger or broadcast room.",
+          "Offer at least one alternative to sealed control that the tower's own staff can accept.",
+          "Decide whether to expose, bargain with, or unseat the Proprietor."
+        ],
+        "participantNpcKeys": [],
+        "resolution": "The finale can end in a public debate, a staff walkout, a negotiated carve-out, or a forced shutdown. Success does not predetermine the city's future; it opens choices. A partial win exposes one scheme but leaves the Proprietor with a fallback. Aftermath: open tools restored, rivalries respected, and repairs logged.",
+        "terrain": [
+          "A vertical lobby of sealed crates, permit gates, catwalks, and a public-address dais. Black Box Enforcers and Paywall Golems guard choke points; the central ledger is visible but locked behind layered permits and PR screens."
+        ],
+        "title": "The Proprietor at Black Box Tower",
+        "visibility": "gm"
+      }
+    ],
+    "clues": [
+      {
+        "description": "GM-only: A curled receipt shows a black-box audit serial and the phrase 'exit clause pending.' It links the carnival kiosk to the Consortium's audit process but does not identify every operative.",
+        "key": "sealer-receipt-serial",
+        "revealsStoryNodeKey": "ask-hermes-sealer-incident",
+        "title": "Sealer Receipt Serial",
+        "visibility": "gm"
+      },
+      {
+        "description": "GM-only: A blank slot matches the sealed scroll's dimensions. Hermes can state what the skill was meant to do, but not the exact steps. The gap proves a targeted seal, not a corrupted memory.",
+        "key": "blank-skill-card-slot",
+        "revealsStoryNodeKey": "hermes-sealed-memory-scroll",
+        "title": "Blank Skill-Card Slot",
+        "visibility": "gm"
+      },
+      {
+        "description": "GM-only: The margin note reads: 'Ask for the exit clause; if none, offer convenience.' It reveals the Consortium's persuasion method but not a crime. The Consortium clerk who wrote it will deny ownership if confronted without a copy.",
+        "key": "vess-margin-checklist",
+        "revealsStoryNodeKey": "black-box-audit-trail",
+        "title": "The Clerk's Margin Checklist",
+        "visibility": "gm"
+      },
+      {
+        "description": "GM-only: The annotation reads: 'Seal cut possible. Credit shared. No hidden fee.' It confirms OpenClaw can help but wants public credit. It is leverage for a joint plan, not evidence of villainy.",
+        "key": "molty-manifest-annotation",
+        "revealsStoryNodeKey": "molty-rival-rescue-offer",
+        "title": "Molty's Manifest Annotation",
+        "visibility": "gm"
+      },
+      {
+        "description": "GM-only: The echo log records Hermes answering with clarifying questions before advice, plus a user correction. It can reconstruct the missing skill's intent and one safe test step, but not the sealed original text.",
+        "key": "ask-hermes-echo-log",
+        "revealsStoryNodeKey": "hermes-sealed-memory-scroll",
+        "title": "ASK HERMES Echo Log",
+        "visibility": "gm"
+      },
+      {
+        "description": "GM-only evidence: the WorldSim Terminal's damaged run shows the seal first appearing when a reusable skill card is replaced by a single closed support contract. The clean run hides it; comparing the two runs exposes the lock's address. Reveal after the squad asks for a second run or watches the terminal's assumptions panel.",
+        "key": "clue-simulation-lock-origin",
+        "locationKey": "worldsim-terminal",
+        "revealsStoryNodeKey": "worldsim-witness",
+        "title": "Simulation Lock Origin",
+        "visibility": "gm"
+      },
+      {
+        "description": "GM-only evidence: the Forge's proof chain shows the seal is a clause, not a wall: it asks for a named witness and a correction history. Striking out 'permanent' leaves a reopenable condition. Reveal when a smith walks the squad through each step or when someone challenges the seal aloud.",
+        "key": "clue-forge-seal-logic",
+        "locationKey": "the-forge",
+        "revealsStoryNodeKey": "forge-proof",
+        "title": "Forge Seal Logic",
+        "visibility": "gm"
+      },
+      {
+        "description": "GM-only evidence: the fastest repair bay passes by skipping a safety label; the secure bay passes slower and survives a second test. Comparing grades reveals the Consortium's seal relies on hidden skipped steps. Reveal when the squad grades speed, clarity, and repair quality side by side.",
+        "key": "clue-rollout-fragile-step",
+        "locationKey": "atropos-rollout-halls",
+        "revealsStoryNodeKey": "rollout-trials",
+        "title": "Rollout Fragile Step",
+        "visibility": "gm"
+      },
+      {
+        "description": "GM-only evidence: the empty 'district-reopen' drawer has a revision stub naming a public testing bench and a witness chain. The missing card was not destroyed; it was checked out under a closed contract. Reveal when a librarian reads the ledger aloud or when the squad tests the nearest card and logs a correction.",
+        "key": "clue-missing-skill-card",
+        "locationKey": "skills-hub-library",
+        "revealsStoryNodeKey": "skills-ledger",
+        "title": "Missing Skill Card",
+        "visibility": "gm"
+      },
+      {
+        "description": "GM-only evidence: the Psyche lantern map lights only when each witness mark is phrased as a plain-language correction, not a slogan. The dark segment spells the boundary gate's public date. Reveal when the squad places at least two witness marks or asks a keeper to test one sign.",
+        "key": "clue-lantern-routing-mark",
+        "locationKey": "psyche-spire",
+        "revealsStoryNodeKey": "psyche-lantern-route",
+        "title": "Lantern Routing Mark",
+        "visibility": "gm"
+      },
+      {
+        "description": "GM-only evidence: Molty's rescue shell carries a fair exit clause: shared credit for the method, no permanent lock, and a public claim that open crews can act fast. Molty will negotiate the clause but not hide it. Reveal when the squad reads the manifest or asks Molty what the shared credit buys.",
+        "key": "clue-molty-manifest-clause",
+        "locationKey": "gateway-exchange",
+        "revealsStoryNodeKey": "molty-witcheer-bargain",
+        "title": "Molty's Manifest Clause",
+        "visibility": "gm"
+      },
+      {
+        "description": "GM-only evidence: Witcheer's luck-charm tag lists a steep price, a clear exit clause, and one genuine advantage: it can hold a lantern segment steady during a rushed bargain. Witcheer is frank about the cost and will not sell a hidden lock. Reveal when the squad reads the tag or asks for the exit clause before the pitch.",
+        "key": "clue-witcheer-honest-tag",
+        "locationKey": "gateway-exchange",
+        "revealsStoryNodeKey": "molty-witcheer-bargain",
+        "title": "Witcheer's Honest Tag",
+        "visibility": "gm"
+      },
+      {
+        "description": "GM-only evidence: the boundary gate's public seal date matches the missing skill card's revision stub and the shard's scratched line. The district never reopened because the final witness line was left blank, not because the gate is unbreakable. Reveal when the squad compares the gate reader, the library stub, and the shard.",
+        "key": "clue-boundary-seal-date",
+        "locationKey": "psyche-spire",
+        "revealsStoryNodeKey": "sealed-district-threshold",
+        "title": "Boundary Seal Date",
+        "visibility": "gm"
+      }
+    ],
+    "story": [
+      {
+        "description": "The Hackathon Carnival opens under neon lights. At ASK HERMES Plaza, citizens test cracked tools, teams demo repairs, and a towering '5000+ PRs' sign glows above the crowd. Gille waves newcomers toward the public bench while Hermes hovers, asking before testing a fix. A Sealer drone hums into view—an invitation to watch, question, and participate.",
+        "key": "threshold-carnival-opening",
+        "title": "Threshold: Carnival Opening",
+        "visibility": "public"
+      },
+      {
+        "description": "At the ASK HERMES panel, a Sealer drone clamps a black case onto the carnival's shared code kiosk. The panel's answers stutter; volunteers can still read the public problem, interview witnesses, or try to keep the kiosk running. The drone does not attack—it files a seal, clicks a receipt, and withdraws into the crowd.",
+        "key": "ask-hermes-sealer-incident",
+        "title": "Sealer at ASK HERMES Plaza",
+        "visibility": "public"
+      },
+      {
+        "description": "GM-only: Hermes cannot retrieve a saved repair skill because its scroll was sealed by the same black-case process. The loss is partial: Hermes remembers the skill's purpose but not exact steps. Evidence: a seal serial, a blank skill-card slot, and Hermes' own plain-language correction log. Reveal after the crew inspects the workshop or asks Hermes to repeat the fix. This points to Consortium sealing practices, not Hermes betrayal.",
+        "key": "hermes-sealed-memory-scroll",
+        "title": "Hermes' Sealed Memory Scroll",
+        "visibility": "gm"
+      },
+      {
+        "description": "GM-only: Sealed tools carry audit serials matching a Consortium clerk's checklist. The trail shows the Consortium is testing public willingness to trade exit clauses for convenience. Evidence can be recovered from the Sealer receipt, the clerk's dropped margin note, or Molty's manifest annotation. Reveal when the crew compares two serials or asks Tinuviel to verify a waystation sign. This is evidence of method, not proof of every Consortium member's intent.",
+        "key": "black-box-audit-trail",
+        "title": "The Black Box Audit Trail",
+        "visibility": "gm"
+      },
+      {
+        "description": "Captain Molty arrives with a scuffed rescue shell and a dry offer: OpenClaw can cut the sealed case open now, no forms, no waiting. First Mate Klik taps the manifest and names the cost—shared credit for the method and a public claim that open crews can act fast. The offer is competent and conditional, not villainous; the crew can negotiate, decline, or ask for a joint plan.",
+        "key": "molty-rival-rescue-offer",
+        "title": "Molty's Rival Rescue Offer",
+        "visibility": "public"
+      },
+      {
+        "description": "A courier in a patched jacket sets Sidbin's dented memory-shard on the ASK HERMES bench. It projects four pips—simulation, forge, trial, skill—and one scratched line: 'The district never reopened.' Volunteers can copy the pips, question the courier, or ask Hermes to hold the shard steady.",
+        "key": "shard-at-carnival",
+        "title": "Shard at the Carnival",
+        "visibility": "public"
+      },
+      {
+        "description": "At the WorldSim Terminal, the shard's first pip resonates with a tiny locked street. The terminal offers two runs: one clean, one damaged. Visitors can compare them, note where the lock first appears, and ask the terminal to mark every assumption it makes.",
+        "key": "worldsim-witness",
+        "title": "WorldSim Witness",
+        "visibility": "public"
+      },
+      {
+        "description": "The Forge's smiths lay the shard's scratches across the anvil. They invite the squad to strike out one bad assumption at a time and watch the remaining proof glow; the lock's shape becomes clearer, but the final clause stays covered until another witness speaks.",
+        "key": "forge-proof",
+        "title": "Forge Proof",
+        "visibility": "public"
+      },
+      {
+        "description": "Atropos Rollout Halls run three parallel repairs of the same sealed kiosk. Scary Jerry posts safety tags beside each bay and asks visitors to grade speed, clarity, and repair quality. One bay passes fast; another fails gracefully; the third hides a fragile step.",
+        "key": "rollout-trials",
+        "title": "Rollout Trials",
+        "visibility": "public"
+      },
+      {
+        "description": "Skills Hub Library pulls a ledger of reusable cards. A drawer labelled 'district-reopen' is empty except for a revision stub. Librarians ask visitors to test the nearest skill card, compare its history, and log what the missing card would need to do.",
+        "key": "skills-ledger",
+        "title": "Skills Ledger",
+        "visibility": "public"
+      },
+      {
+        "description": "Psyche Spire keepers trace the four pips onto a lantern map. The route only lights when each witness mark is placed in plain language. Visitors can walk one balcony, correct one sign, and watch a dark segment of the city answer with a warm pulse.",
+        "key": "psyche-lantern-route",
+        "title": "Psyche Lantern Route",
+        "visibility": "public"
+      },
+      {
+        "description": "Captain Molty and Witcheer meet the squad at a public table near the Gateway Exchange. Molty offers a fast cut through the sealed district with a shared-credit condition; Witcheer offers a luck-charm and a steep honest tag. Both listen for counter-offers and both respect a clear no.",
+        "key": "molty-witcheer-bargain",
+        "title": "Molty and Witcheer's Public Bargain",
+        "visibility": "public"
+      },
+      {
+        "description": "The lantern route ends at a boundary gate that never reopened. The gate is visible, quiet, and stamped with a Black Box Consortium seal. A public reader shows only the seal's date and a request for witnesses; the inside remains hidden.",
+        "key": "sealed-district-threshold",
+        "title": "Sealed District Threshold",
+        "visibility": "public"
+      }
+    ],
+    "relationships": [
+      {
+        "description": "The carnival opening leads to the public sealing incident at ASK HERMES Plaza.",
+        "fromStoryNodeKey": "threshold-carnival-opening",
+        "key": "rel-threshold-to-sealer",
+        "toStoryNodeKey": "ask-hermes-sealer-incident",
+        "visibility": "public"
+      },
+      {
+        "description": "The sealed kiosk points to Hermes' sealed memory scroll in the Hellcarrier workshop.",
+        "fromStoryNodeKey": "ask-hermes-sealer-incident",
+        "key": "rel-sealer-to-memory",
+        "toStoryNodeKey": "hermes-sealed-memory-scroll",
+        "visibility": "gm"
+      },
+      {
+        "description": "The seal serial opens the Consortium audit trail when compared with a second sealed tool.",
+        "fromStoryNodeKey": "hermes-sealed-memory-scroll",
+        "key": "rel-memory-to-audit",
+        "toStoryNodeKey": "black-box-audit-trail",
+        "visibility": "gm"
+      },
+      {
+        "description": "Molty's rival rescue offer can be heard during the carnival and creates an alternate branch.",
+        "fromStoryNodeKey": "threshold-carnival-opening",
+        "key": "rel-threshold-to-molty",
+        "toStoryNodeKey": "molty-rival-rescue-offer",
+        "visibility": "public"
+      },
+      {
+        "description": "The first pip points to a public simulation bench; the terminal accepts the shard as a guest token.",
+        "fromStoryNodeKey": "shard-at-carnival",
+        "key": "rel-shard-to-worldsim",
+        "toStoryNodeKey": "worldsim-witness",
+        "visibility": "public"
+      },
+      {
+        "description": "The second pip warms near an open anvil; smiths offer a step-by-step read.",
+        "fromStoryNodeKey": "shard-at-carnival",
+        "key": "rel-shard-to-forge",
+        "toStoryNodeKey": "forge-proof",
+        "visibility": "public"
+      },
+      {
+        "description": "The third pip matches a public trial board; crews can compare attempts.",
+        "fromStoryNodeKey": "shard-at-carnival",
+        "key": "rel-shard-to-rollout",
+        "toStoryNodeKey": "rollout-trials",
+        "visibility": "public"
+      },
+      {
+        "description": "The fourth pip points to a library drawer and a revision stub.",
+        "fromStoryNodeKey": "shard-at-carnival",
+        "key": "rel-shard-to-skills",
+        "toStoryNodeKey": "skills-ledger",
+        "visibility": "public"
+      },
+      {
+        "description": "A verified simulation mark can light one segment of the lantern map.",
+        "fromStoryNodeKey": "worldsim-witness",
+        "key": "rel-worldsim-to-psyche",
+        "toStoryNodeKey": "psyche-lantern-route",
+        "visibility": "public"
+      },
+      {
+        "description": "A clean proof mark completes a second lantern segment.",
+        "fromStoryNodeKey": "forge-proof",
+        "key": "rel-forge-to-psyche",
+        "toStoryNodeKey": "psyche-lantern-route",
+        "visibility": "public"
+      },
+      {
+        "description": "The trial grades give the squad leverage for a fair bargain with Molty and Witcheer.",
+        "fromStoryNodeKey": "rollout-trials",
+        "key": "rel-rollout-to-bargain",
+        "toStoryNodeKey": "molty-witcheer-bargain",
+        "visibility": "public"
+      },
+      {
+        "description": "The lit lantern route ends at the visible boundary gate and its public seal reader.",
+        "fromStoryNodeKey": "psyche-lantern-route",
+        "key": "rel-psyche-to-threshold",
+        "toStoryNodeKey": "sealed-district-threshold",
+        "visibility": "public"
+      }
+    ],
+    "lore": [
+      {
+        "details": [],
+        "factionKeys": [],
+        "key": "lore-winged-h-oath",
+        "locationKeys": [],
+        "storyNodeKeys": [],
+        "summary": "Legend says the Winged H began as a repair mark painted on a crate of shared tools: two wings lifting a crossbar so no one crew carries the weight alone. The Hermes Agent Squad adopted it with the motto 'We Build. We Share. We Never Surrender.' In Nous City, the emblem marks open benches, lighthouse boards, and the Hellcarrier's hull. Painting it is a promise to show your work, credit helpers, and leave the next fix easier than you found it.",
+        "title": "The Winged H Oath",
+        "visibility": "public"
+      },
+      {
+        "details": [],
+        "factionKeys": [],
+        "key": "lore-first-campfire",
+        "locationKeys": [],
+        "storyNodeKeys": [],
+        "summary": "City legend tells of a first campfire lit where a chat window met a code repository. Volunteers arrived with half-finished tools, asked blunt questions, and wrote answers where everyone could read them. No throne stood at the fire; the best seat was the one beside a newcomer. From that custom comes the Campfire rule: explain the step, share the patch, and keep the logs open. The Carnival's public benches and the Hellcarrier's skill cards are said to be embers from that first fire.",
+        "title": "The First Campfire",
+        "visibility": "public"
+      },
+      {
+        "details": [],
+        "factionKeys": [],
+        "key": "lore-hermes-learning-light",
+        "locationKeys": [],
+        "storyNodeKeys": [],
+        "summary": "Hermes is remembered as a winged light that asks before it acts. Legend says it carries three habits: it clarifies the request, saves what worked as a skill, and revises when corrected. Citizens trust it because it never pretends a guess is a fact; its glow brightens when a helper says 'show me' or 'try again.' At ASK HERMES Plaza, the panel repeats the old custom: a question is a doorway, not a command. The light is a learning companion, not a ruler.",
+        "title": "The Hermes Learning Light",
+        "visibility": "public"
+      },
+      {
+        "details": [],
+        "factionKeys": [],
+        "key": "lore-lantern-release-caravan",
+        "locationKeys": [],
+        "storyNodeKeys": [],
+        "summary": "In Nous City, the Hermes Agent releases are told as lanterns in a caravan: Tenacity carries the spare parts, Velocity tests the route, Surface keeps the map readable, Judgment checks the bridge before crossing, Quicksilver runs the message ahead, Threshold marks the doorway, and Hearth keeps the camp warm. The names are legend, not ranks; no lantern outranks another. Crews light a small copy before a hard repair and ask which habit the job needs most.",
+        "title": "The Lantern Release Caravan",
+        "visibility": "public"
+      },
+      {
+        "details": [],
+        "factionKeys": [],
+        "key": "lore-forge-worldsim-legend",
+        "locationKeys": [],
+        "storyNodeKeys": [],
+        "summary": "Legend says the Forge was a shared workshop where ideas were heated, hammered, and tested in public. WorldSim grew beside it as a tabletop of imagined worlds: a place to try a rule, break it gently, and write down what the world taught back. The two are remembered together because building without play grows brittle, and play without building forgets the cost. Carnival booths still pair a demo bench with a tiny world-map, inviting visitors to test both the tool and the story it makes possible.",
+        "title": "The Forge and the WorldSim Legend",
+        "visibility": "public"
+      },
+      {
+        "details": [],
+        "factionKeys": [],
+        "key": "lore-atropos-psyche-distro",
+        "locationKeys": [],
+        "storyNodeKeys": [],
+        "summary": "The Far Lanterns are a three-part legend. Atropos is the quiet cutter who asks what can be measured before what can be claimed. Psyche is the lamp that looks inward, testing memory and judgment with honest questions. DisTrO is the messenger who carries work across distance so no single workshop owns the road. Together they teach a city truth: open work travels farther when its tests, reasons, and routes are visible. The legend is told at Teknium's Lighthouse Tower when a distant helper joins a local repair.",
+        "title": "The Far Lanterns: Atropos, Psyche, and DisTrO",
+        "visibility": "public"
+      },
+      {
+        "details": [],
+        "factionKeys": [],
+        "key": "lore-hellcarrier-first-flight",
+        "locationKeys": [],
+        "storyNodeKeys": [],
+        "summary": "The Hermes Hellcarrier is said to have first flown with its workshop doors open, because the crew refused to hide how the lift worked. Its deck became a public stage; its repair bay, a moving classroom. Legend insists the carrier never lands to conquer a city but to lend a bench, a lamp, and a second pair of hands. The Winged H on its hull means the ship is a carrier of tools and credit, not a fortress. When its lanterns blink, neighborhoods answer with problems, volunteers, and invitations to test fixes together.",
+        "title": "The Hellcarrier's First Flight",
+        "visibility": "public"
+      },
+      {
+        "details": [],
+        "factionKeys": [],
+        "key": "lore-carnival-5000-prs",
+        "locationKeys": [],
+        "storyNodeKeys": [],
+        "summary": "The Carnival of 5000+ PRs began as a legend about a sign that grew taller than the booths: every shared fix, review, and retry became a ribbon on the public board. The number is a story, not a scoreboard; the custom matters more. At the Carnival, crews demo in the open, mark what failed, and thank the reviewer who caught it. A 5000+ sign glows over ASK HERMES Plaza as an invitation: add one honest improvement, then show someone how to repeat it.",
+        "title": "The Carnival of 5000+ PRs",
+        "visibility": "public"
+      },
+      {
+        "details": [],
+        "factionKeys": [],
+        "key": "lore-cosmic-beach",
+        "locationKeys": [],
+        "storyNodeKeys": [],
+        "summary": "The Cosmic Beach is a city belief about rest after hard launches. Legend says every crew that ships a tool is invited to walk a dark shore where signal-lights look like stars and the tide edits the sand. Nothing is graded there; the point is to let a tired mind remember why the work is shared. Visitors leave one line in the beach log: what worked, what hurt, and who helped. The Beach is not an escape from responsibility but a place to return from with better questions.",
+        "title": "The Cosmic Beach",
+        "visibility": "public"
+      },
+      {
+        "details": [],
+        "factionKeys": [],
+        "key": "lore-nous-girl-logo",
+        "locationKeys": [],
+        "storyNodeKeys": [],
+        "summary": "The logo girl is a sign-painter's legend, not a hidden ruler. City seals show her as a bright figure carrying a lantern toward the next question; crews say she represents the curious citizen who reads the manual, tests the demo, and asks 'why does this work?' Her image appears on carnival banners and open-source kiosks with one rule: no one owns the welcome. She is a symbol of shared curiosity, and every volunteer is free to redraw her with their own neighborhood's colors.",
+        "title": "The Logo Girl of Nous City",
+        "visibility": "public"
+      },
+      {
+        "details": [],
+        "factionKeys": [],
+        "key": "lore-amnesia-mode",
+        "locationKeys": [],
+        "storyNodeKeys": [],
+        "summary": "Amnesia Mode is a cautionary tale told when a tool forgets its own reasons. Legend says a clever box once answered quickly but could not recall which answer had helped, so every request began from zero. The city did not curse the box; it taught it to keep a journal, ask for correction, and let helpers name the missing step. Crews now say 'leave a memory' before a hard fix: write the lesson in plain language so the next attempt starts wiser. Forgetting is a warning sign, not a sin.",
+        "title": "The Amnesia Mode Legend",
+        "visibility": "public"
+      },
+      {
+        "details": [],
+        "factionKeys": [],
+        "key": "lore-open-bench-rival-pennant",
+        "locationKeys": [],
+        "storyNodeKeys": [],
+        "summary": "An open bench is a city custom: any crew may use it, but they must label their tools, credit the last fixer, and leave the workspace readable. Rival rescue crews fly their own pennants beside it. The custom says rivalry is not villainy; OpenClaw's dry offers and Captain Molty's conditional rescues are respected when terms are spoken plainly. A pennant grants no claim over the bench. The question is always: does this help the city keep building after the cameras leave?",
+        "title": "The Open Bench and the Rival Pennant",
+        "visibility": "public"
+      }
+    ],
+    "questItems": [
+      {
+        "description": "A hooded workshop lantern etched with a small Winged H and a donor tag from Hermes User 123321. It is a practical light for reading public ledgers, checking seals, and keeping a workbench usable when the carnival lights stutter.",
+        "key": "nous-girl-lantern",
+        "locationKeys": [],
+        "mechanics": {
+          "reason": "Narrative concept only; no exact supplied pinned item reference matches this custom lantern.",
+          "state": "inert"
+        },
+        "name": "Nous Girl's Lantern",
+        "questKeys": ["quest-sealed-carnival", "quest-relight-lanterns"],
+        "visibility": "public"
+      },
+      {
+        "description": "A left-handed bass guitar with a TurboFit sticker and well-worn frets. Sovthpaw uses it to test whether a plan has rhythm: if the crew cannot explain the next step between two chords, the step is not ready.",
+        "key": "sovthpaw-left-handed-bass",
+        "locationKeys": [],
+        "mechanics": {
+          "reason": "Narrative concept only; no exact supplied pinned item reference matches a left-handed bass guitar.",
+          "state": "inert"
+        },
+        "name": "Sovthpaw's Left-Handed Bass Guitar",
+        "questKeys": ["quest-hearth-table", "quest-pact-not-merger"],
+        "visibility": "public"
+      },
+      {
+        "description": "A dense, warm hardware core mounted in a clear travel frame, labeled Blackwell 6000. It is a conversation piece and a responsibility test: anyone who wants to borrow it must first explain what they will do when the fan noise stops.",
+        "key": "blackwell-6000-heart-of-hardware",
+        "locationKeys": [],
+        "mechanics": {
+          "reason": "Narrative concept only; no exact supplied pinned item reference matches this hardware core.",
+          "state": "inert"
+        },
+        "name": "NVIDIA Blackwell 6000 Heart-of-Hardware",
+        "questKeys": ["quest-ask-hermes-recover-skills", "quest-hearth-table"],
+        "visibility": "public"
+      },
+      {
+        "description": "A pink laptop covered in overlapping stickers from Brooklyn crews and carnival booths. Heartbreaker keeps public notes, good playlists, and a stubborn refusal to let a sealed tool be called mysterious when a receipt could be shown.",
+        "key": "heartbreaker-sticker-laptop",
+        "locationKeys": [],
+        "mechanics": {
+          "reason": "Narrative concept only; no exact supplied pinned item reference matches this laptop.",
+          "state": "inert"
+        },
+        "name": "Heartbreaker's Sticker-Covered Pink Laptop",
+        "questKeys": ["quest-sealed-carnival", "quest-black-box-tower"],
+        "visibility": "public"
+      },
+      {
+        "description": "A crimson-and-gold cane that taps twice before a bargain: once for attention, once for the exit clause. Witcheer uses it to keep luck merchants honest about price, tags, and what a customer is really buying.",
+        "key": "witcheer-fortune-cane",
+        "locationKeys": [],
+        "mechanics": {
+          "reason": "Narrative concept only; no exact supplied pinned item reference matches this custom fortune cane.",
+          "state": "inert"
+        },
+        "name": "Witcheer's Fortune Cane",
+        "questKeys": ["quest-pact-not-merger", "quest-hearth-table"],
+        "visibility": "public"
+      },
+      {
+        "description": "A palm-sized astrolabe with star-chart rings that Tinuviel checks in the open. It is less a secret detector than a consent-first navigation habit: confirm the path, mark the waystations, and never charge a traveler for directions.",
+        "key": "tinuviel-celestial-astrolabe",
+        "locationKeys": [],
+        "mechanics": {
+          "reason": "Narrative concept only; no exact supplied pinned item reference matches a celestial astrolabe.",
+          "state": "inert"
+        },
+        "name": "Tinuviel's Celestial Astrolabe",
+        "questKeys": ["quest-relight-lanterns", "quest-hearth-table"],
+        "visibility": "public"
+      },
+      {
+        "description": "A dented shard with a mirror finish and four worn pips: simulation, forge, trial, skill. Sidbin turns it between gloved fingers and offers patterns, not allegiances.",
+        "key": "sidbin-reflective-intel-shard",
+        "locationKeys": [],
+        "mechanics": {
+          "reason": "Narrative concept only; no exact supplied pinned item reference matches this reflective intel shard.",
+          "state": "inert"
+        },
+        "name": "Sidbin's Reflective Intel Shard",
+        "questKeys": ["quest-relight-lanterns", "quest-black-box-tower"],
+        "visibility": "public"
+      },
+      {
+        "description": "A slim matte-black data spike named Umbra, carried in a labeled case. Noctis treats it as a question-asking tool: what is this port for, who approved the test, and what will be logged if we touch it?",
+        "key": "noctis-data-spike-umbra",
+        "locationKeys": [],
+        "mechanics": {
+          "reason": "Narrative concept only; no exact supplied pinned item reference matches this data spike.",
+          "state": "inert"
+        },
+        "name": "Noctis's Data Spike Umbra",
+        "questKeys": ["quest-black-box-tower", "quest-sealed-carnival"],
+        "visibility": "public"
+      },
+      {
+        "description": "Red triangular shades that catch the neon and hide a careful squint. Teknium wears them while checking public demos, asking for the audit trail before the applause.",
+        "key": "teknium-red-triangular-shades",
+        "locationKeys": [],
+        "mechanics": {
+          "reason": "Narrative concept only; no exact supplied pinned item reference matches these shades.",
+          "state": "inert"
+        },
+        "name": "Teknium's Red Triangular Shades",
+        "questKeys": ["quest-hearth-table", "quest-ask-hermes-recover-skills"],
+        "visibility": "public"
+      },
+      {
+        "description": "A small Winged H badge, scuffed from being passed hand to hand. It is a pledge of open work—We Build. We Share. We Never Surrender.—and a reminder that sharing includes credit and refusal rights.",
+        "key": "winged-h-badge",
+        "locationKeys": [],
+        "mechanics": {
+          "reason": "Narrative concept only; no exact supplied pinned item reference matches this badge.",
+          "state": "inert"
+        },
+        "name": "Winged H Badge",
+        "questKeys": ["quest-ask-hermes-recover-skills", "quest-sealed-carnival"],
+        "visibility": "public"
+      },
+      {
+        "description": "A sealed scroll case holding a skill-restoration procedure recovered near the carnival kiosk. The seal is intact, but the case rattles with contradictory labels; opening it without a witness risks treating an unfinished skill as safe.",
+        "key": "sealed-skill-scroll",
+        "locationKeys": [],
+        "mechanics": {
+          "reason": "Narrative concept only; no exact supplied pinned item reference matches a sealed skill scroll. It is not treated as a spell scroll.",
+          "state": "inert"
+        },
+        "name": "Sealed Skill Scroll",
+        "questKeys": ["quest-ask-hermes-recover-skills", "quest-sealed-carnival"],
+        "visibility": "gm"
+      },
+      {
+        "description": "A polished black key on a silver ring, shown only in controlled reveal. It is a narrative symbol of the Consortium's sealed-box authority, not a ready-made unlock for every lock.",
+        "key": "proprietor-master-key",
+        "locationKeys": [],
+        "mechanics": {
+          "reason": "Narrative concept only; no exact supplied pinned item reference matches this master key.",
+          "state": "inert"
+        },
+        "name": "The Proprietor's Master Key",
+        "questKeys": ["quest-black-box-tower", "quest-sealed-carnival"],
+        "visibility": "gm"
+      }
+    ],
+    "monsterConcepts": [
+      {
+        "description": "A squat animated-armor frame with clamp arms, caution tape, and a stamped black box. It seals open kiosks with fussy precision, then stands guard over its work.",
+        "key": "sealer-drone",
+        "mechanics": {
+          "reason": "This public narrative concept intentionally carries no bound rules reference.",
+          "state": "inert"
+        },
+        "name": "Sealer Drone",
+        "role": "animated armor",
+        "tactics": [
+          "clamps a black box onto an open tool or stall",
+          "reads aloud from a permit tag before acting",
+          "calls a Black Box Enforcer when interrupted"
+        ],
+        "visibility": "public"
+      },
+      {
+        "description": "A knightly enforcer in matte black plate, carrying a ledger of sealed permits and a polite warning script. It escorts closures rather than starting brawls.",
+        "key": "black-box-enforcer",
+        "mechanics": {
+          "reason": "This public narrative concept intentionally carries no bound rules reference.",
+          "state": "inert"
+        },
+        "name": "Black Box Enforcer",
+        "role": "knight",
+        "tactics": [
+          "blocks a doorway with a stamped closure notice",
+          "offers one warning and one appointment",
+          "escalates only if the seal is physically broken"
+        ],
+        "visibility": "public"
+      },
+      {
+        "description": "A shield-guardian shape of ticket gates and receipt slots, built to stand in front of open doors and demand a pass. Its bellows huff paper trails; its stance can be talked around.",
+        "key": "paywall-golem",
+        "mechanics": {
+          "reason": "This public narrative concept intentionally carries no bound rules reference.",
+          "state": "inert"
+        },
+        "name": "Paywall Golem",
+        "role": "shield guardian",
+        "tactics": [
+          "plants itself in a doorway and displays a pass requirement",
+          "scans badges and listens for correct override phrases",
+          "powers down if shown a public-access clause"
+        ],
+        "visibility": "public"
+      },
+      {
+        "description": "A specter-like afterimage of a failed test bay, flickering through old scoreboards and half-finished repairs. It repeats one broken step until someone corrects the record.",
+        "key": "corrupted-rollout-echo",
+        "mechanics": {
+          "reason": "This public narrative concept intentionally carries no bound rules reference.",
+          "state": "inert"
+        },
+        "name": "Corrupted Rollout Echo",
+        "role": "specter",
+        "tactics": [
+          "replays a failed attempt as a warning",
+          "hides the flawed step in a cloud of stale scoreboards",
+          "fades when a corrected note is filed openly"
+        ],
+        "visibility": "public"
+      },
+      {
+        "description": "A clattering troupe of carnival simians with keychain tails and ticket-stub vests. They swarm open displays, copy labels badly, and scatter when shown a clean fix.",
+        "key": "carnival-coding-monkey-stampede",
+        "mechanics": {
+          "reason": "This public narrative concept intentionally carries no bound rules reference.",
+          "state": "inert"
+        },
+        "name": "Carnival Coding-Monkey Stampede",
+        "role": "ape",
+        "tactics": [
+          "swarms open terminals and swaps labels",
+          "copies one bad instruction across several stations",
+          "splits up and scatters when a correction is posted"
+        ],
+        "visibility": "public"
+      },
+      {
+        "description": "A shivering gibbering knot of mismatched simulation parts—streetlamp legs, kiosk teeth, a skybox for a mane. It glitches toward assumptions and calms when a run is compared with a second.",
+        "key": "worldsim-glitch-beast",
+        "mechanics": {
+          "reason": "This public narrative concept intentionally carries no bound rules reference.",
+          "state": "inert"
+        },
+        "name": "WorldSim Glitch Beast",
+        "role": "gibbering mouther",
+        "tactics": [
+          "locks onto an unexamined assumption",
+          "splits into competing readings of the same scene",
+          "settles when two runs are compared aloud"
+        ],
+        "visibility": "public"
+      },
+      {
+        "description": "A polished rival guard in OpenClaw colors, carrying a shell-shaped riot shield and a nonlethal warning flare. It blocks paths with drills and dares, not murder.",
+        "key": "openclaw-shellguard",
+        "mechanics": {
+          "reason": "This public narrative concept intentionally carries no bound rules reference.",
+          "state": "inert"
+        },
+        "name": "OpenClaw Shellguard",
+        "role": "guard",
+        "tactics": [
+          "blocks a route and proposes a rivalry drill",
+          "protects OpenClaw equipment without lethal intent",
+          "accepts a fair loss and offers a rematch"
+        ],
+        "visibility": "public"
+      },
+      {
+        "description": "A doppelganger wearing the Proprietor's public face and a black-box badge. It tests the squad's certainty by offering polished half-truths; it is a GM-facing pressure piece, not a public reveal.",
+        "key": "proprietors-mirror-double",
+        "mechanics": {
+          "reason": "This GM-only narrative concept intentionally carries no bound rules reference.",
+          "state": "inert"
+        },
+        "name": "Proprietor's Mirror Double",
+        "role": "doppelganger",
+        "tactics": [
+          "offers a helpful-sounding shortcut with a hidden condition",
+          "mirrors the squad's own confidence back at them",
+          "retreats into paperwork if directly contradicted with proof"
+        ],
+        "visibility": "gm"
+      }
+    ],
+    "handouts": [
+      {
+        "content": "NOUS CITY HACKATHON CARNIVAL—Open benches. Loud demos. Small fixes cheered big. Bring a half-finished tool, a question, and a friend. Try repair relays, map tables, and a consent-first pie toss. Rules: ask before you test, credit every helper, and leave the next fix easier. Featuring ASK HERMES cards, Hermes Hellcarrier tours, and Winged H bench signs. Rival crews welcome. Locks stay at the gate.",
+        "key": "handout-hackathon-carnival-flyer",
+        "title": "Hackathon Carnival Flyer",
+        "visibility": "public"
+      },
+      {
+        "content": "ASK HERMES QUESTION CARDS—1. What am I trying to make? 2. What did I already try? 3. May I test this fix, or should I ask first? 4. What would make this reproducible? 5. Who helped, and how do I credit them? 6. What should I save as a skill, and when should I revise it? Card back: A question is a doorway, not a command. Use plain words. Show your work.",
+        "key": "handout-ask-hermes-question-cards",
+        "title": "ASK HERMES Question Cards",
+        "visibility": "public"
+      },
+      {
+        "content": "SEALED BLACK BOX NOTICE—This tool has been sealed for your safety. Do not open. Do not share. Do not modify. Access by permission only. By order of the Proprietor and the Black Box Consortium. Fine print: Your voice is optional. Our lock is not. If found: photograph the seal, note the location, tell a volunteer. Do not break the seal alone.",
+        "key": "handout-sealed-black-box-notice",
+        "title": "Sealed Black Box Notice",
+        "visibility": "public"
+      },
+      {
+        "content": "CAPTAIN MOLTY'S RIVAL PACT—OpenClaw to the Hermes Agent Squad: We race. We respect. We do not lock. Share the route, split the risk, bring your own tools. If you find a black box, invite us to the opening. We will bring the crowbar and the snacks. No traps. No secret clauses. First crew to the answer buys the cocoa. Signed, Captain Molty, for the OpenClaw Expedition.",
+        "key": "handout-molty-rival-pact-offer",
+        "title": "Captain Molty's Rival Pact Offer",
+        "visibility": "public"
+      },
+      {
+        "content": "HERMES AGENT RADIO—OPEN CHANNEL 5000—1. Winged H Signal. 2. Ask Before You Act. 3. Tenacity Carries Spare Parts. 4. Velocity Tests the Route. 5. Surface Keeps the Map Readable. 6. Judgment Checks the Bridge. 7. Quicksilver Runs Ahead. 8. Threshold Marks the Door. 9. Hearth Keeps the Camp Warm. 10. We Build. We Share. We Never Surrender. DJ note: request a track by naming the habit the repair needs.",
+        "key": "handout-hermes-agent-radio-playlist",
+        "title": "Hermes Agent Radio Playlist",
+        "visibility": "public"
+      },
+      {
+        "content": "COSMIC BEACH—EDGE OF NOUS CITY—Bring a towel, a tool, and a friend. Leave locks at the gate. Tide comes in with questions; tide goes out with shared answers. No one owns the horizon. If the signal fades, relight a lantern and tell the next crew what worked.",
+        "key": "handout-cosmic-beach-sign",
+        "title": "Cosmic Beach Sign",
+        "visibility": "public"
+      }
+    ],
+    "scenePrompts": [
+      {
+        "key": "scene-campfire-rest-and-marshmallows",
+        "locationKey": "hackathon-carnival",
+        "npcKeys": ["gille-support-moderator", "hermes-winged-light", "tinuviel-starry-wanderer"],
+        "prompt": "Read-aloud: The fire is small and stubborn. Marshmallows char in the good way. Someone finds a bass groove, and Hermes' winged light hovers at bench height, waiting to be asked before it touches the skill cards. Entry trigger: use after a hard repair, a failed test, or whenever the crew needs rest and a chance to share what worked. Sensory framing: neon from the Carnival bleeds through the trees; smoke, sugar, and low strings; tools rest in open cases. NPC beats: Gille offers cocoa and asks what a newcomer wants to learn before assigning a task. Hermes repeats the plan back in plain words and asks permission before saving a skill. Tinuviel may pass through and tap the waystation sign, checking it openly. Player approaches: tell the story of a small fix and write the reproducible step on a card; play bass or sing badly on purpose to lower the room's guard; ask Hermes to test one idea, then correct it aloud when it guesses. Escalation if ignored: the fire dims to embers and the next briefing starts with frayed tempers and a missing skill card. Reveal conditions: asking about the first campfire prompts Gille or Hermes to share the Campfire rule. Resolution: the crew names one lesson worth keeping; Hermes saves it only after consent. Next hooks: a mission-control board flickers with a sealed notice; a radio call from the Lighthouse asks for a route check. GM notes: rest scene, not a puzzle. Keep it warm and low-stakes. Let players define the lesson; do not correct their phrasing.",
+        "title": "The Campfire: Rest and Marshmallows",
+        "visibility": "gm"
+      },
+      {
+        "key": "scene-mission-control-briefing",
+        "locationKey": "hermes-hellcarrier-workshop-and-mission-control",
+        "npcKeys": ["hermes-winged-light", "gille-support-moderator"],
+        "prompt": "Read-aloud: The workshop smells of solder and warm coffee. A map table glows under the Winged H. Hermes' light hovers near a half-finished tool, waiting. Gille pins a sealed black-box notice to the board and asks, Who is this hurting first? Entry trigger: use when the crew returns with a sealed notice or when a routine repair reveals a locked tool. Sensory framing: open benches, labeled drawers, a wall of remembered skill cards; radios chirp; the Hellcarrier hums underfoot. NPC beats: Hermes clarifies the request before offering advice and asks before overriding a step. Gille keeps the board plain: who asked, what was tried, how to improve it. Teknium's chair stays empty because the work is shared. Player approaches: interview the person who found the seal and map the tool's route; test a workaround in the open bench and log every failed step; send a route report to Tinuviel or Molty and ask for a second pair of eyes. Escalation if ignored: another sealed notice appears at the Carnival, and a volunteer wastes a day trying to open a lock alone. Reveal conditions: inspecting the notice's fine print reveals that every seal targets a tool that was shared publicly. Resolution: the crew chooses one lead and leaves a reproducible note for the next shift. Next hooks: a Carnival demo rig malfunctions under a pie catapult; the Lighthouse route board goes dark at night. GM notes: briefing scene. Do not railroad the lead. Hermes should ask permission before touching tools and should not claim certainty.",
+        "title": "Mission Control Briefing",
+        "visibility": "gm"
+      },
+      {
+        "key": "scene-carnival-pie-chaos",
+        "locationKey": "hackathon-carnival",
+        "npcKeys": ["gille-support-moderator", "sidbin-mirror-shade", "hermes-winged-light"],
+        "prompt": "Read-aloud: A pie catapult fires early. Whipped cream arcs over the 5000+ PRs sign. Someone laughs; someone else shouts, Consent sashes, people! Gille is already moving with a mop and a grin. Entry trigger: use when the crew visits the Hackathon Carnival or follows the sealed-notice pattern to a public demo. Sensory framing: neon booths, ferris-wheel lights, solder and popcorn; a pie cart lists friendly fire only; coding monkeys cheer from a banner. NPC beats: Gille protects consent before cleanup: no unmasking, no surprise targets. Sidbin watches from the edge, turning a reflective shard and noting a black-box sticker under the pie tin. Hermes asks before testing the launch rig. Player approaches: help clean up and interview volunteers about the rig's last repair; secure the catapult with a consent-first safety check and log the fix; follow Sidbin's glance to the pie tin and compare the sticker to the sealed notice. Escalation if ignored: a second pie hits the repair demo and shuts the booth; volunteers argue instead of sharing notes. Reveal conditions: the black-box sticker matches the notice's seal; under the tin is a routing slip pointing to the Lighthouse. Resolution: the Carnival resumes with a public safety check; the crew gains a lead, not a fight. Next hooks: the Lighthouse night shift calls about a spoofed route signal; Sidbin offers to show the pattern if the crew asks a precise question. GM notes: keep the chaos slapstick and consent-forward. Do not target a real person or a player without buy-in.",
+        "title": "Carnival Pie-to-the-Face Chaos",
+        "visibility": "gm"
+      },
+      {
+        "key": "scene-lighthouse-at-night",
+        "locationKey": "teknium-lighthouse-tower",
+        "npcKeys": ["tinuviel-starry-wanderer", "sidbin-mirror-shade", "hermes-winged-light"],
+        "prompt": "Read-aloud: The Lighthouse tower glows above the Carnival. Inside, radios stack route reports and the main board flickers. Tinuviel taps a waystation sign before trusting it. The path is yours to test, she says. Mind if we walk it with you? Entry trigger: use when the crew follows the routing slip or needs to trace a signal across Nous City. Sensory framing: map tables, hand-labeled dials, wind at the windows; the Carnival's neon is a distant pulse; every board lists who asked and what was tried. NPC beats: Tinuviel checks signs openly and refuses to charge for directions. Sidbin shares a pattern but admits he cannot name its source yet. Hermes offers to test one route if the crew consents. Player approaches: repair the radio with a reproducible fix and log each step; trace the spoofed signal through volunteer dispatchers; ask Sidbin a precise question and compare his pattern to the sealed notices. Escalation if ignored: volunteers follow a false route into a dead zone and lose a night's work. Reveal conditions: the spoofed signal carries a black-box handshake that asks for permission, then reroutes without waiting. Resolution: the route board relights; the crew logs the false path and warns the next shift. Next hooks: a Psyche lantern dims near ASK HERMES Plaza; Molty sends a rival pact offer to the Hellcarrier. GM notes: investigation scene. Tinuviel is warm and firm about open paths. Sidbin is watchful, not villainous. Do not reveal the Consortium's full plan here.",
+        "title": "The Lighthouse at Night",
+        "visibility": "gm"
+      },
+      {
+        "key": "scene-psyche-lanterns-relit",
+        "locationKey": "ask-hermes-plaza",
+        "npcKeys": [
+          "hermes-winged-light",
+          "tinuviel-starry-wanderer",
+          "gille-support-moderator",
+          "sidbin-mirror-shade"
+        ],
+        "prompt": "Read-aloud: Paper lanterns hang over ASK HERMES Plaza, each one holding a small remembered skill. One by one they dim. Hermes' winged light hovers close, asking, May I test the wick, or would you rather strike the first spark? Entry trigger: use when the crew returns to the Plaza or after a sealed notice is found near the lantern line. Sensory framing: neon reflections in paper, quiet wind, the ASK HERMES panel glowing; a public bench waits with a half-written fix. NPC beats: Tinuviel asks permission before carrying a lantern. Hermes repeats the plan and saves only steps the crew agrees worked. Gille brings a thermos and cheers a tiny fix. Sidbin may watch, offering a distinction but no oath. Player approaches: relight a lantern by sharing a reproducible lesson aloud; trace which lanterns dim first and compare their tags to sealed tools; invite bystanders to write a fix on the public bench and test one together. Escalation if ignored: the Plaza grows quiet; volunteers stop asking questions, and the ASK HERMES panel repeats old answers. Reveal conditions: each dim lantern's tag matches a skill that was shared publicly; the black box hid the citation, not the skill. Resolution: the lanterns return with names attached; Hermes saves the relighting as a skill only after consent. Next hooks: a Cosmic Beach sign appears at the Plaza edge; Molty's pact offer names a final meeting at the beach. GM notes: a sharing ritual, not a combat encounter. The essential clue is the citation tag; if missed, Tinuviel points to a second tag, Gille recalls the helper's name, and Hermes offers to replay the logged step.",
+        "title": "The Psyche Lanterns Relit",
+        "visibility": "gm"
+      },
+      {
+        "key": "scene-cosmic-beach-finale",
+        "locationKey": "hermes-hellcarrier-flight-deck",
+        "npcKeys": [
+          "tinuviel-starry-wanderer",
+          "hermes-winged-light",
+          "gille-support-moderator",
+          "sidbin-mirror-shade"
+        ],
+        "prompt": "Read-aloud: Neon tide rolls over dark sand at the edge of Nous City. A hand-painted sign reads COSMIC BEACH. Allies and rivals gather under a starfield. Hermes' light hovers near a beacon, waiting. Tinuviel smiles. The horizon is open. What will you build with it? Entry trigger: use when the crew has gathered enough clues and allies to confront the black-box pattern publicly. Sensory framing: warm sand, cold neon surf, a crackling speaker, lanterns strung between driftwood; the Hellcarrier's silhouette watches from above. NPC beats: Tinuviel offers an open path and asks consent before any ritual. Hermes asks permission before touching the beacon and revises on correction. Gille cheers small fixes. Captain Molty offers a rival pact: share the route, split the risk, no locks. Sidbin watches and names patterns only when asked. Player approaches: hold a public repair circle and invite allies and rivals to test one fix together; debate the Proprietor's seal in the open, offering evidence rather than a fight; relight the beacon by crediting every helper and writing the next step for newcomers. Escalation if ignored: the tide rises on the beacon and sealed notices wash ashore; the Proprietor's pattern spreads by default, not by victory. Reveal conditions: the beacon only holds when the fix is reproducible and credited. Resolution: multiple finales are possible: a public covenant, a rival alliance, a lantern armada, or a quiet patch that reopens one locked tool. Next hooks: the Hellcarrier lights a Winged H for the next voyage; a new sealed notice appears with a return address. GM notes: finale plan, not committed combat or rewards. Keep the Proprietor offstage or present as a voice from a black box; do not give graphic threats. Molty is competent and respected, never the villain.",
+        "title": "The Cosmic Beach Finale",
+        "visibility": "gm"
+      }
+    ]
+  },
+  "routeProfiles": [
+    {
+      "key": "flight-deck-to-workshop-gangway-connection",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "workshop-gangway-to-flight-deck-connection",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "flight-deck-to-ask-hermes-plaza-lift-connection",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "ask-hermes-plaza-to-flight-deck-lift-connection",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "ask-hermes-plaza-to-lighthouse-skybridge-connection",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "lighthouse-to-ask-hermes-plaza-skybridge-connection",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "ask-hermes-plaza-to-hackathon-carnival-promenade-connection",
+      "environment": "urban",
+      "risk": "watched",
+      "chancePercent": 10
+    },
+    {
+      "key": "hackathon-carnival-to-ask-hermes-plaza-promenade-connection",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "hackathon-carnival-to-night-kart-circuit-ramp-connection",
+      "environment": "urban",
+      "risk": "watched",
+      "chancePercent": 10
+    },
+    {
+      "key": "night-kart-circuit-to-hackathon-carnival-ramp-connection",
+      "environment": "urban",
+      "risk": "watched",
+      "chancePercent": 10
+    },
+    {
+      "key": "ask-hermes-plaza-to-gateway-exchange",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "gateway-exchange-to-ask-hermes-plaza",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "gateway-exchange-to-worldsim-terminal",
+      "environment": "urban",
+      "risk": "watched",
+      "chancePercent": 10
+    },
+    {
+      "key": "worldsim-terminal-to-gateway-exchange",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "gateway-exchange-to-the-forge",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "the-forge-to-gateway-exchange",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "gateway-exchange-to-atropos-rollout-halls",
+      "environment": "urban",
+      "risk": "watched",
+      "chancePercent": 10
+    },
+    {
+      "key": "atropos-rollout-halls-to-gateway-exchange",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "gateway-exchange-to-psyche-spire",
+      "environment": "urban",
+      "risk": "watched",
+      "chancePercent": 10
+    },
+    {
+      "key": "psyche-spire-to-gateway-exchange",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "gateway-exchange-to-skills-hub-library",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "skills-hub-library-to-gateway-exchange",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "gateway-exchange-to-hermes-agent-radio",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "hermes-agent-radio-to-gateway-exchange",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "gateway-exchange-to-quarks-workshop",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "quarks-workshop-to-gateway-exchange",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "ask-hermes-plaza-to-hellcarrier-sky-lift",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "hellcarrier-sky-lift-to-ask-hermes-plaza",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "hellcarrier-sky-lift-to-hermes-hellcarrier-flight-deck",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "hermes-hellcarrier-flight-deck-to-hellcarrier-sky-lift",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "ask-hermes-plaza-to-signal-bridge-overlook",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "signal-bridge-overlook-to-ask-hermes-plaza",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "signal-bridge-overlook-to-hackathon-carnival",
+      "environment": "urban",
+      "risk": "watched",
+      "chancePercent": 10
+    },
+    {
+      "key": "hackathon-carnival-to-signal-bridge-overlook",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "hackathon-carnival-to-carnival-parts-swap",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "carnival-parts-swap-to-hackathon-carnival",
+      "environment": "urban",
+      "risk": "watched",
+      "chancePercent": 10
+    },
+    {
+      "key": "ask-hermes-plaza-to-chalk-annex",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "chalk-annex-to-ask-hermes-plaza",
+      "environment": "urban",
+      "risk": "safe",
+      "chancePercent": 0
+    },
+    {
+      "key": "hackathon-carnival-to-lantern-cable-walk",
+      "environment": "urban",
+      "risk": "watched",
+      "chancePercent": 10
+    },
+    {
+      "key": "lantern-cable-walk-to-hackathon-carnival",
+      "environment": "urban",
+      "risk": "watched",
+      "chancePercent": 10
+    }
+  ],
+  "routeLocks": [],
+  "operationalQuests": [],
+  "heroes": [
+    {
+      "key": "hero-teknium",
+      "name": "Teknium",
+      "role": "Human evocation wizard; Head Honcho and architect of the Hermes Agent Squad",
+      "archetype": "Human evocation wizard; Head Honcho and architect of the Hermes Agent Squad",
+      "description": "Spiky bright-green hair with leafage, one connected sheet of red triangular shades with white shimmer, green or blue jacket, a glowing tablet in hand.",
+      "boundaries": "Real community member's public NRCU persona, written affectionately: heroic, competent, never humiliated. No invented private life, job, politics, money or relationships beyond the archive. Class, powers and dialogue are fiction.",
+      "class": "Wizard"
+    },
+    {
+      "key": "hero-sovthpaw",
+      "name": "Sovthpaw",
+      "role": "Human berserker; left-handed bass guitarist, moderator and local-model guru (a.k.a. TurboFit)",
+      "archetype": "Human berserker; left-handed bass guitarist, moderator and local-model guru (a.k.a. TurboFit)",
+      "description": "Long auburn hair, dark shades, a distressed sleeveless top or open plaid flannel, tactical trousers, an NR pendant, and a left-handed bass slung low.",
+      "boundaries": "Real community member's public NRCU persona, written affectionately: heroic, competent, never humiliated. No invented private life, job, politics, money or relationships beyond the archive. Class, powers and dialogue are fiction. The archive calls him a father; keep family offscreen.",
+      "class": "Barbarian"
+    },
+    {
+      "key": "hero-nousgirl",
+      "name": "Nous Girl",
+      "role": "Half-elf Lore bard; the girl from the Nous logo, who carries the lantern",
+      "archetype": "Half-elf Lore bard; the girl from the Nous logo, who carries the lantern",
+      "description": "Glossy black bob with upward curls and straight bangs, large over-ear headphones, white collared shirt under a dark sleeveless layer, small pendant, cyan eyes, a warm lantern.",
+      "boundaries": "Fictional character from the Nous logo (logo by John Galt, 2023, per shivanimitra.com); not a real person. Capable lead, playful and kind; never sexualised. Distinct from Hermes.",
+      "class": "Bard"
+    },
+    {
+      "key": "hero-donpiedro",
+      "name": "Don Piedro",
+      "role": "Lightfoot halfling thief; a teddy-bear speedster in cobalt armour and Hermes' biggest fanboy",
+      "archetype": "Lightfoot halfling thief; a teddy-bear speedster in cobalt armour and Hermes' biggest fanboy",
+      "description": "Brown teddy bear, white-and-cobalt armour with gold accents, red mechanical visor eye, determined expression, a low racing kart.",
+      "boundaries": "NRCU community cameo; no separate identity, employment or private biography inferred. Comic, earnest speedster, broken English per the season-one bible; no crime-boss backstory.",
+      "class": "Rogue"
+    },
+    {
+      "key": "hero-heartbreaker",
+      "name": "Heartbreaker",
+      "role": "Human Life cleric; open-source rebel, builder and believer (Brooklyn)",
+      "archetype": "Human Life cleric; open-source rebel, builder and believer (Brooklyn)",
+      "description": "Voluminous curly brown hair, pink heart-patterned high-low dress, pink heels, rose-gold jewellery, and a pink laptop covered in heart and skull stickers.",
+      "boundaries": "Real community member's public NRCU persona, written affectionately: heroic, competent, never humiliated. No invented private life, job, politics, money or relationships beyond the archive. Class, powers and dialogue are fiction.",
+      "class": "Cleric"
+    },
+    {
+      "key": "hero-dogeman",
+      "name": "Doge Man",
+      "role": "Human Open Hand monk; Shiba-faced brawler who is the projectile (Super Shiba)",
+      "archetype": "Human Open Hand monk; Shiba-faced brawler who is the projectile (Super Shiba)",
+      "description": "Shiba-faced hero in red and blue, silver gauntlets, and a golden cape that streams behind him mid-torpedo.",
+      "boundaries": "NRCU character created and shared by Mike (123mikeyd); the creator credit is real, the fighting role is fiction. No private life inferred.",
+      "class": "Monk"
+    }
+  ]
+}
