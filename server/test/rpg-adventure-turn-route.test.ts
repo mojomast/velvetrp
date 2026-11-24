@@ -1071,7 +1071,10 @@ describe("M2.11 adventure turn routes", () => {
       payload: {
         narrationStatus: {
           source: "deterministic-fallback",
-          text: narrationFallback(declaration, [], { currentLocation: "Lantern Quay" }),
+          text: narrationFallback(declaration, [], {
+            currentLocation: "Lantern Quay",
+            locationDetails: { "Lantern Quay": "A fog-damp landing." },
+          }),
         },
       },
     });
@@ -1123,7 +1126,10 @@ describe("M2.11 adventure turn routes", () => {
       payload: {
         narrationStatus: {
           source: "deterministic-fallback",
-          text: narrationFallback(declaration, [], { currentLocation: "Lantern Quay" }),
+          text: narrationFallback(declaration, [], {
+            currentLocation: "Lantern Quay",
+            locationDetails: { "Lantern Quay": "A fog-damp landing." },
+          }),
         },
       },
     });
@@ -1901,7 +1907,7 @@ You roll your shoulders, set your grip, and step back toward the stair. The lamp
         receipts: [expect.any(Object)],
         narrationStatus: {
           source: "deterministic-fallback",
-          text: "You arrive at Parc des Pionniers.",
+          text: "You arrive at Parc des Pionniers. From here you can reach Pointe-Saint-Gilles.",
         },
       },
     });

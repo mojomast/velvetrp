@@ -47,6 +47,7 @@ import type { Repository } from "../../../repo/index.js";
 import { completeWithProvider, ProviderHttpError } from "../../../provider/index.js";
 import { getPromptPreset } from "../../../presets.js";
 import { adventureNarrationMessages, conversationNarrationMessages } from "../../../agent/adventurePrompt.js";
+import { preferredCastFromPublicRoster } from "../../../agent/rosterCastContext.js";
 import { buildActorStateContext, type ActorStateContext } from "../../../agent/actorStateContext.js";
 import { isRoutineObservationDeclaration } from "../../../agent/declarationAttempt.js";
 import { adventureTurnBudgets, type TurnBudgetPolicy } from "../../../agent/turnBudget.js";
@@ -514,6 +515,7 @@ const NARRATION_SOCIAL_GESTURE_SIGNAL =
 export interface NarrationFallbackContext {
   currentLocation?: string | null;
   reachablePlaces?: readonly string[];
+  locationDetails?: Readonly<Record<string, string>>;
   health?: ActorStateContext["health"];
   activeCombat?: ActorStateContext["activeCombat"];
 }
@@ -543,6 +545,34 @@ function withReachablePlaces(
   currentLocation: string | null,
 ): string {
   return `${text}${reachablePlaceSentence(context?.reachablePlaces, currentLocation)}`;
+}
+
+function locationDescription(
+  context: NarrationFallbackContext | undefined,
+  name: string | null | undefined,
+): string | null {
+  if (!context?.locationDetails || !name) return null;
+  const key = normalizedNarration(name);
+  for (const [location, description] of Object.entries(context.locationDetails)) {
+    if (normalizedNarration(location) !== key) continue;
+    const detail = description.trim().replace(/[.!?]+$/, "");
+    return detail || null;
+  }
+  return null;
+}
+
+function locationDetailSentence(description: string): string {
+  return `${description.charAt(0).toLocaleUpperCase("en-US")}${description.slice(1)}`;
+}
+
+function locationDetailClause(description: string): string {
+  return `${description.charAt(0).toLocaleLowerCase("en-US")}${description.slice(1)}`;
+}
+
+function locationHoldFallback(currentLocation: string | null, context: NarrationFallbackContext | undefined): string {
+  const detail = locationDescription(context, currentLocation);
+  if (!currentLocation || !detail) return NARRATION_HOLD_TEXT;
+  return `You stay at ${currentLocation}, where ${locationDetailClause(detail)}; nothing has changed yet, and you are still there. Whatever you meant to do is still ahead of you.`;
 }
 
 function healthStatusFallback(health: { current: number; max: number }): string {
@@ -589,7 +619,7 @@ function zeroReceiptFallback(
   context?: NarrationFallbackContext,
 ): string {
   const text = normalizedNarration(declaration);
-  if (!text) return withReachablePlaces(NARRATION_HOLD_TEXT, context, currentLocation);
+  if (!text) return withReachablePlaces(locationHoldFallback(currentLocation, context), context, currentLocation);
   if (NARRATION_REST_SIGNAL.test(text)) return NARRATION_REST_FALLBACK;
   const woundStatus = woundStatusFallback(declaration, context?.health);
   if (woundStatus) return woundStatus;
@@ -608,7 +638,7 @@ function zeroReceiptFallback(
       currentLocation,
     );
   }
-  return withReachablePlaces(NARRATION_HOLD_TEXT, context, currentLocation);
+  return withReachablePlaces(locationHoldFallback(currentLocation, context), context, currentLocation);
 }
 /**
  * Receipt-bound fallback prose. With committed receipts the composition is already fact-specific;
@@ -620,7 +650,7 @@ export function narrationFallback(
   values: readonly NarrationReceipt[],
   context?: NarrationFallbackContext,
 ): string {
-  if (values.length > 0) return composeNarration(values);
+  if (values.length > 0) return composeNarration(values, context);
   return zeroReceiptFallback(declaration, context?.currentLocation ?? null, context);
 }
 
@@ -636,7 +666,8 @@ export function holdNarration(hold: AdventureHold): string {
   const step = hold.suggestedNextStep?.trim().replace(/\.$/, "");
   const suggestion = step ? ` You could ${step.charAt(0).toLowerCase()}${step.slice(1)}.` : "";
   const guard = " Nothing has changed yet; you are still where you were.";
-  return `${message}${suggestion}${guard}${reachablePlaceSentence(hold.reachablePlaces, null)}`;
+  const reachable = reachablePlaceSentence(hold.reachablePlaces, null);
+  return `${message}${suggestion}${guard}${reachable && !message.includes(reachable) ? reachable : ""}`;
 }
 
 /**
@@ -736,22 +767,36 @@ function checkReceiptProse(value: Extract<NarrationReceipt, { kind: "check" }>):
 }
 
 /** Receipt-only prose retained for every provider and settings failure lane. */
-function composeNarration(values: readonly NarrationReceipt[]): string {
+function composeNarration(values: readonly NarrationReceipt[], context?: NarrationFallbackContext): string {
   if (values.length === 0) return NARRATION_HOLD_TEXT;
   const facts = values.map((value) => {
-    if (value.kind === "travel") return `You arrive at ${value.destination}.`;
+    if (value.kind === "travel") {
+      const detail = locationDescription(context, value.destination);
+      const arrival = detail
+        ? `You arrive at ${value.destination}. ${locationDetailSentence(detail)}.`
+        : `You arrive at ${value.destination}.`;
+      return withReachablePlaces(arrival, context, context?.currentLocation ?? value.destination);
+    }
     if (value.kind === "journey") {
       if (value.status === "interrupted")
         return `The journey stops at ${value.currentLocation}; ${value.destination} remains pending.${value.interruption ? ` ${value.interruption}` : ""} Continue the journey when you are ready.`;
-      return `You arrive at ${value.currentLocation} after ${value.legs} leg${value.legs === 1 ? "" : "s"} of travel (${value.elapsedMinutes} minutes).`;
+      const detail = locationDescription(context, value.currentLocation);
+      const arrival = detail
+        ? `You arrive at ${value.currentLocation} after ${value.legs} leg${value.legs === 1 ? "" : "s"} of travel (${value.elapsedMinutes} minutes). ${locationDetailSentence(detail)}.`
+        : `You arrive at ${value.currentLocation} after ${value.legs} leg${value.legs === 1 ? "" : "s"} of travel (${value.elapsedMinutes} minutes).`;
+      return withReachablePlaces(arrival, context, context?.currentLocation ?? value.currentLocation);
     }
     if (value.kind === "inventory") {
       if (value.action === "equip") return `You equip ${value.quantity} ${value.itemLabel} in the ${value.slot} slot.`;
       if (value.action === "unequip")
         return `You unequip ${value.quantity} ${value.itemLabel} from the ${value.slot} slot.`;
       if (value.action === "gift") return `You give ${value.quantity} ${value.itemLabel} to ${value.recipient}.`;
-      if (value.action === "consume")
-        return `You consume ${value.quantity} ${value.itemLabel}; only its removal from inventory is established, with no item effect.`;
+      if (value.action === "consume") {
+        if (!context?.currentLocation)
+          return `You consume ${value.quantity} ${value.itemLabel}; only its removal from inventory is established, with no item effect.`;
+        const detail = locationDescription(context, context.currentLocation);
+        return `You put ${value.quantity} ${value.itemLabel} to your lips at ${context.currentLocation}${detail ? `, where ${locationDetailClause(detail)}` : ""}; nothing in you changes, and the item is simply gone from your pack, with no item effect.`;
+      }
       return `You drop ${value.quantity} ${value.itemLabel}.`;
     }
     if (value.kind === "commerce")
@@ -1817,6 +1862,24 @@ function narrationReachablePlaces(repo: Repo & Repository, principalId: string, 
     return [];
   }
 }
+function narrationLocationDetails(
+  repo: Repo & Repository,
+  principalId: string,
+  turn: PrivateAdventureTurn,
+): Readonly<Record<string, string>> {
+  if (typeof repo.getCampaignWorld !== "function") return {};
+  try {
+    const world = repo.getCampaignWorld(principalId, turn.campaignId, turn.sessionId);
+    const details: Record<string, string> = {};
+    for (const location of world?.visibleLocations ?? []) {
+      const description = location.description?.trim();
+      if (location.name && description) details[location.name] = description;
+    }
+    return details;
+  } catch {
+    return {};
+  }
+}
 async function performNarration(
   repo: Repo & Repository,
   principalId: string,
@@ -1828,6 +1891,7 @@ async function performNarration(
 ): Promise<NarrationResult> {
   const safeReceipts = narrationReceipts(repo, principalId, turn);
   const reachablePlaces = narrationReachablePlaces(repo, principalId, turn);
+  const locationDetails = narrationLocationDetails(repo, principalId, turn);
   // A deliberate mechanical hold is the turn's own deterministic narration. It is computed from
   // the orchestrator's bounded reason, never from provider output. Social/routine declarations
   // instead continue to bounded conversation narration. A held declaration does not resolve its own mechanics, so any receipt
@@ -1866,6 +1930,7 @@ async function performNarration(
       ? {
           currentLocation: publicNarrationContext(repo, principalId, turn)?.currentLocation ?? null,
           reachablePlaces,
+          locationDetails,
           health: holdActorState.health,
           activeCombat: holdActorState.activeCombat,
         }
@@ -1880,7 +1945,7 @@ async function performNarration(
     });
     return { turn, text: heldText, source: "deterministic-fallback" };
   }
-  let fallbackText = narrationFallback(turn.declaration, safeReceipts ?? [], { reachablePlaces });
+  let fallbackText = narrationFallback(turn.declaration, safeReceipts ?? [], { reachablePlaces, locationDetails });
   if (!safeReceipts) return recordFallback(fallbackText, "provider-error");
   const callId = key("narration-provider", turn.turnId);
   const recovered = repo.getNarrationProviderDispatch(principalId, turn.turnId, callId);
@@ -1910,6 +1975,7 @@ async function performNarration(
       narrationFallback(turn.declaration, safeReceipts, {
         currentLocation: publicContext?.currentLocation ?? null,
         reachablePlaces,
+        locationDetails,
         health: actorState.health,
         activeCombat: actorState.activeCombat,
       }),
@@ -1950,6 +2016,7 @@ async function performNarration(
   fallbackText = narrationFallback(turn.declaration, safeReceipts, {
     currentLocation: publicContext.currentLocation,
     reachablePlaces,
+    locationDetails,
     health: actorState.health,
     activeCombat: actorState.activeCombat,
   });
@@ -2331,6 +2398,7 @@ function finalizeNarrationDispatch(
       text: narrationFallback(currentTurn.declaration, narrationReceipts(repo, principalId, currentTurn) ?? [], {
         currentLocation: publicContext?.currentLocation ?? null,
         reachablePlaces: narrationReachablePlaces(repo, principalId, currentTurn),
+        locationDetails: narrationLocationDetails(repo, principalId, currentTurn),
       }),
       source: "deterministic-fallback",
     };
@@ -2380,6 +2448,15 @@ function publicNarrationContext(repo: Repo & Repository, principalId: string, tu
       )
     : snapshot.visibleCast;
   const presentNpcs = repo.getAdventureNarrationPresentNpcs(principalId, turn.turnId);
+  const presentNpcNames = presentNpcs.map((npc) => npc.name);
+  const preferredCast = preferredCastFromPublicRoster({
+    locationName: snapshot.currentActorLocation,
+    presentNames: presentNpcNames,
+    roster:
+      typeof repo.listAdventureNarrationRosterNpcs === "function"
+        ? repo.listAdventureNarrationRosterNpcs(principalId, turn.turnId)
+        : [],
+  });
   const npcKnowledge = presentNpcs
     .map(({ npcId, name }) => ({
       name,
@@ -2410,7 +2487,8 @@ function publicNarrationContext(repo: Repo & Repository, principalId: string, tu
     context: {
       ...campaignPublicContext({ ...snapshot, visibleCast: cast }),
       historicalRecall,
-      presentNpcNames: presentNpcs.map((npc) => npc.name),
+      presentNpcNames,
+      ...(preferredCast ? { preferredCast } : {}),
       npcKnowledge,
     },
     safety: repo.getSessionZeroSafetyPolicy(principalId, turn.campaignId),

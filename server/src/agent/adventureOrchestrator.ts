@@ -76,6 +76,7 @@ import {
   type SelectedAdventureTool,
 } from "./toolRegistry.js";
 import { adventurePlanningMessages } from "./adventurePrompt.js";
+import { preferredCastFromPublicRoster } from "./rosterCastContext.js";
 import { buildActorStateContext, type ActorStateContext } from "./actorStateContext.js";
 import { candidateLabels, labeled, type LabeledCandidate } from "./providerCandidateProjection.js";
 import {
@@ -1527,6 +1528,26 @@ function knownLocationNames(repository: Repository, turn: PrivateAdventureTurn):
   }
 }
 
+function preferredCastForTurn(
+  repository: Repository,
+  turn: PrivateAdventureTurn,
+  locationName: string | null,
+): ReturnType<typeof preferredCastFromPublicRoster> {
+  try {
+    const presentNames =
+      typeof repository.getAdventureNarrationPresentNpcs === "function"
+        ? repository.getAdventureNarrationPresentNpcs(OWNER, turn.turnId).map((npc) => npc.name)
+        : [];
+    const roster =
+      typeof repository.listAdventureNarrationRosterNpcs === "function"
+        ? repository.listAdventureNarrationRosterNpcs(OWNER, turn.turnId)
+        : [];
+    return preferredCastFromPublicRoster({ locationName, presentNames, roster });
+  } catch {
+    return undefined;
+  }
+}
+
 /** How a declaration references the actor's current place and the advertised destinations. */
 export interface DeclarationLocationReference {
   currentLocation: string | null;
@@ -1807,10 +1828,17 @@ export function describeHeldDeclaration(context: HeldDeclarationContext): Advent
       ? ` ${compoundPendingTrade ? "A purchase or sale" : compoundPending.rest ? "A rest" : compoundPending.check ? "A check" : compoundPending.combat ? "An attack" : "A later step"} still waits after the move.`
       : "";
     const noRoad = travel ? "" : ` No road from here runs to ${reference.mismatchedDestination}.`;
+    const roadClause = reachablePlaces.length
+      ? ` From here you can reach ${
+          reachablePlaces.length === 1
+            ? reachablePlaces[0]!
+            : `${reachablePlaces.slice(0, -1).join(", ")} or ${reachablePlaces[reachablePlaces.length - 1]!}`
+        }.`
+      : "";
     return {
       reason: "location-mismatch",
       suggestedCandidateId: travel?.candidateId ?? null,
-      message: `You are still at ${context.currentLocation ?? "your last known place"}, not ${reference.mismatchedDestination}.${noRoad}${pending}`,
+      message: `You are still at ${context.currentLocation ?? "your last known place"}, not ${reference.mismatchedDestination}.${noRoad}${roadClause}${pending}`,
       suggestedNextStep: travel
         ? `Travel to ${reference.mismatchedDestination}`
         : `Move to ${reference.mismatchedDestination} first`,
@@ -2866,6 +2894,7 @@ export async function orchestrateAdventureTurn(
     declaration: turn.declaration,
     allowedTools: advertisedToolNames,
   });
+  const preferredCast = preferredCastForTurn(repository, turn, snapshot.currentActorLocation);
   const messages = adventurePlanningMessages({
     authorityContext: basketText,
     candidateContext: adventureCandidateContext(candidateOptions, turn.declaration),
@@ -2879,6 +2908,7 @@ export async function orchestrateAdventureTurn(
     history,
     rulesetDescriptor: snapshot.ruleset.descriptor,
     safetyPolicy: repository.getSessionZeroSafetyPolicy(OWNER, turn.campaignId),
+    ...(preferredCast ? { preferredCast } : {}),
   });
   const priorIds = new Set<string>();
   const existingPlanning = repository.getDurableAgentPlanningState(OWNER, turn.turnId);
