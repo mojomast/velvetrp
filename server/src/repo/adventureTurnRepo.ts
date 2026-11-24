@@ -25,6 +25,14 @@ export interface AdventureTurnRepository
     AdventureTurnAgentResponseRepository {
   /** Public, presently co-located NPC identities for player adventure narration. */
   getAdventureNarrationPresentNpcs(principalId: string, turnId: string): Array<{ npcId: string; name: string }>;
+  /**
+   * Public campaign NPCs for player adventure prompts. Home locations are included only when the
+   * acting player has discovered that public place; GM-only artifacts never appear.
+   */
+  listAdventureNarrationRosterNpcs(
+    principalId: string,
+    turnId: string,
+  ): Array<{ name: string; homeLocation: string | null }>;
   /** Validates consent/context, executes mechanics, and links its receipt in one SQLite transaction. */
   executeApprovedAgentProposalAtomically(
     principalId: string,
@@ -83,6 +91,36 @@ export function createAdventureTurnRepository(
       ORDER BY npc.npc_id LIMIT 12`,
         )
         .all(turn.campaignId, turn.sessionId, turn.actorId) as Array<{ npcId: string; name: string }>;
+    },
+    listAdventureNarrationRosterNpcs(principalId, turnId) {
+      const turn = reads.getAdventureTurn(principalId, turnId);
+      if (!turn || !("declaration" in turn)) return [];
+      return db
+        .prepare(
+          `SELECT npc.public_name name,
+        CASE
+          WHEN location.visibility='public' AND EXISTS(
+            SELECT 1 FROM campaign_location_discoveries_v28 discovery
+            JOIN campaign_actor_private_state actor
+              ON actor.campaign_id=discovery.campaign_id AND actor.actor_id=discovery.actor_id
+            WHERE discovery.campaign_id=npc.campaign_id AND discovery.location_id=presence.location_id
+              AND actor.controller_principal_id=?
+          ) THEN location.public_name
+          ELSE NULL
+        END homeLocation
+      FROM campaign_npcs_v28 npc
+      LEFT JOIN campaign_npc_presence_v43 presence
+        ON presence.campaign_id=npc.campaign_id AND presence.npc_id=npc.npc_id
+        AND presence.session_id=? AND presence.state='present'
+      LEFT JOIN campaign_locations_v28 location
+        ON location.campaign_id=presence.campaign_id AND location.location_id=presence.location_id
+      WHERE npc.campaign_id=?
+        AND NOT EXISTS(SELECT 1 FROM campaign_generation_accepted_artifacts_v52 hidden
+          WHERE hidden.campaign_id=npc.campaign_id AND hidden.server_resource_id=npc.npc_id
+            AND hidden.artifact_kind='npc' AND hidden.visibility='gm')
+      ORDER BY npc.npc_id LIMIT 128`,
+        )
+        .all(principalId, turn.sessionId, turn.campaignId) as Array<{ name: string; homeLocation: string | null }>;
     },
     executeApprovedAgentProposalAtomically(principalId, turnId, proposalId) {
       guard();

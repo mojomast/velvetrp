@@ -5,7 +5,8 @@ import {
   conversationNarrationMessages,
 } from "../src/agent/adventurePrompt.js";
 import { dmNarrationMessages } from "../src/agent/dmNarration.js";
-import { rankNpcsForLocation, rosterPreferenceInstructions } from "../src/agent/rosterPreference.js";
+import { preferredCastFromRepositories } from "../src/agent/rosterCastContext.js";
+import { mergeRosterNpcs, rankNpcsForLocation, rosterPreferenceInstructions } from "../src/agent/rosterPreference.js";
 import { defaultHarnessSettings } from "../src/defaults.js";
 
 const HN = [
@@ -108,7 +109,7 @@ describe("rosterPreferenceInstructions", () => {
 const harness = defaultHarnessSettings();
 const preferredCast = rankNpcsForLocation({ locationName: "Night Kart Circuit", npcs: HN });
 
-function allContent(messages: Array<{ content?: string }>): string {
+function allContent(messages: ReadonlyArray<{ content?: string | null }>): string {
   return messages.map((message) => message.content ?? "").join("\n");
 }
 
@@ -169,5 +170,68 @@ describe("adventure prompts carry roster preference", () => {
     );
     expect(text).toContain("GottZ");
     expect(text).toMatch(/do not invent named (extras|npcs)|before inventing named/i);
+  });
+});
+
+describe("mergeRosterNpcs", () => {
+  it("keeps the first spelling and fills a home location from a later row", () => {
+    const merged = mergeRosterNpcs(
+      [{ name: "GottZ", archetype: "Loud night kart racer" }, { name: "TunaCookie" }],
+      [{ name: "gottz", homeLocation: "Hermes Hellcarrier Flight Deck" }],
+    );
+    expect(merged).toEqual([
+      { name: "GottZ", homeLocation: "Hermes Hellcarrier Flight Deck", archetype: "Loud night kart racer" },
+      { name: "TunaCookie" },
+    ]);
+  });
+});
+
+describe("preferredCastFromRepositories", () => {
+  it("ranks listed and placed NPCs without inventing extras or treating a wider-roster racer as present", () => {
+    const ranked = preferredCastFromRepositories({
+      locationName: "Night Kart Circuit",
+      presentNames: [],
+      listNpcs: () => ({
+        npcs: [
+          { publicState: { name: "GottZ", archetype: "Loud night kart racer" } },
+          { publicState: { name: "TunaCookie" } },
+          { publicState: { name: "FatCat" } },
+        ],
+      }),
+      getCast: () => ({
+        state: "running",
+        presentCast: [
+          { publicState: { name: "GottZ" }, location: { label: "Hermes Hellcarrier Flight Deck" } },
+          { publicState: { name: "TunaCookie" }, location: { label: "Hermes Hellcarrier Flight Deck" } },
+        ],
+      }),
+    });
+    expect(ranked?.present).toEqual([]);
+    expect(ranked?.tiedToLocation).toEqual([]);
+    expect(ranked?.widerRoster).toEqual(expect.arrayContaining(["GottZ", "TunaCookie", "FatCat"]));
+    for (const invented of ["Ovi", "Sable", "Wren"]) {
+      expect(ranked?.present.concat(ranked.tiedToLocation, ranked.widerRoster)).not.toContain(invented);
+    }
+  });
+
+  it("puts a co-located NPC in present and a differently placed NPC on the wider roster", () => {
+    const ranked = preferredCastFromRepositories({
+      locationName: "ASK HERMES Plaza",
+      presentNames: ["I Sneeze Kittens"],
+      listNpcs: () => ({
+        npcs: [{ publicState: { name: "I Sneeze Kittens" } }, { publicState: { name: "GGB the Gummy Bee" } }],
+      }),
+      getCast: () => ({
+        state: "running",
+        presentCast: [
+          { publicState: { name: "I Sneeze Kittens" }, location: { label: "ASK HERMES Plaza" } },
+          { publicState: { name: "GGB the Gummy Bee" }, location: { label: "Psyche Spire" } },
+        ],
+      }),
+    });
+    expect(ranked?.present).toEqual(["I Sneeze Kittens"]);
+    expect(ranked?.tiedToLocation).toEqual([]);
+    expect(ranked?.widerRoster).toContain("GGB the Gummy Bee");
+    expect(ranked?.present).not.toContain("GGB the Gummy Bee");
   });
 });
