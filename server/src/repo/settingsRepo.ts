@@ -170,6 +170,16 @@ export async function updateProviderSettings(patch: UpdateProviderInput): Promis
     ) {
       next.adventureTurnBudget.maxTotalTokens = clampInt(patch.adventureTurnBudget.maxTotalTokens, 1, 1_000_000_000);
     }
+    if (
+      typeof patch.adventureTurnBudget.maxNarrationTokens === "number" &&
+      Number.isFinite(patch.adventureTurnBudget.maxNarrationTokens)
+    ) {
+      next.adventureTurnBudget.maxNarrationTokens = clampInt(
+        patch.adventureTurnBudget.maxNarrationTokens,
+        1,
+        1_000_000_000,
+      );
+    }
     if (patch.adventureTurnBudget.maxEstimatedCostUsd === null) next.adventureTurnBudget.maxEstimatedCostUsd = null;
     if (
       typeof patch.adventureTurnBudget.maxEstimatedCostUsd === "number" &&

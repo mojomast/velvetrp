@@ -161,8 +161,12 @@ describe("real DM harness boundaries used by the corpus", () => {
     const controlled = selectAdventureTools(snapshot(), [], [candidate]);
     expect(controlled.find((tool) => tool.name === "exact_quest_objective.select")?.provider.parameters).toMatchObject({
       additionalProperties: false,
-      properties: { candidateId: { enum: [candidate.candidateId] }, digest: { enum: [candidate.digest] } },
+      // Round 9 C1: candidates are listed only in the candidate table; the schema carries the slim pair.
+      properties: { candidateId: { type: "string" }, digest: { type: "string" } },
     });
+    expect(
+      JSON.stringify(controlled.find((tool) => tool.name === "exact_quest_objective.select")?.provider.parameters),
+    ).not.toContain(candidate.candidateId);
     const unauthorized = selectAdventureTools(
       snapshot({ audience: { kind: "player", actorId: "actor-b" }, authority: { role: "observer", control: "none" } }),
       [],

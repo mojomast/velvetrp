@@ -209,7 +209,7 @@ async function select(f: ReturnType<typeof fixture>, action: string) {
     }),
   );
   expect(tool, JSON.stringify(result)).toBeDefined();
-  expect(tool.parameters.oneOf[0].required).toEqual(["candidateId", "digest"]);
+  expect(tool.parameters.required).toEqual(["candidateId", "digest"]);
   expect(JSON.stringify(tool.parameters)).not.toMatch(/entryId|itemId|revision|outcome/i);
   return { turn, candidate, result };
 }

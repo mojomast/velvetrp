@@ -212,7 +212,7 @@ async function select(f: ReturnType<typeof fixture>, action: string) {
     }),
   );
   expect(tool, JSON.stringify(result)).toBeDefined();
-  expect(tool.parameters.oneOf[0].required).toEqual(["candidateId", "digest"]);
+  expect(tool.parameters.required).toEqual(["candidateId", "digest"]);
   expect(JSON.stringify(tool.parameters)).not.toMatch(/entryId|itemId|revision|outcome/i);
   return { turn, candidate, result };
 }
@@ -253,19 +253,22 @@ describe("drop is a discard, and approved mechanics never strand a turn", () => 
       turn = makeTurn(f, "I drop my Waylamp here."),
       candidates = f.repo.generateAdventureInventoryCandidates("local-owner", turn.turnId),
       drop = candidates.find((value) => value.action === "drop")!;
-    let tool: any;
+    let tool: any,
+      offered = "";
     await orchestrateAdventureTurn(
       f.repo,
       turn.turnId,
       deps(async (input) => {
         tool ??= input.tools?.find((value) => value.name === "exact_inventory_action.select");
+        // Round 9 C1: candidates are listed only in the candidate table, not in the tool schema.
+        offered ||= JSON.stringify(input.messages);
         return complete(drop);
       }),
     );
     expect(tool).toBeDefined();
-    expect(JSON.stringify(tool)).toContain(drop.candidateId);
+    expect(offered).toContain(drop.candidateId);
     for (const gift of candidates.filter((value) => value.action === "gift"))
-      expect(JSON.stringify(tool)).not.toContain(gift.candidateId);
+      expect(offered).not.toContain(gift.candidateId);
     f.repo.close();
   });
 

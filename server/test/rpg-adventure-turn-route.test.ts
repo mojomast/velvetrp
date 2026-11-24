@@ -11,6 +11,7 @@ import { createRepository } from "../src/repo/index.js";
 import type { CampaignListRepository } from "../src/routes/rpg/v1/features.js";
 import { narrationFallback, providerNarrationMatchesReceipts } from "../src/routes/rpg/v1/adventureTurns.js";
 import { useTmpDataDir } from "./helpers.js";
+import { firstExactCandidate } from "./r9-planner-harness.js";
 import { DND_5E_RULESET_DESCRIPTOR, VELVET_LEGACY_RULESET_DESCRIPTOR } from "../src/rulesets/index.js";
 
 useTmpDataDir();
@@ -2193,8 +2194,7 @@ You roll your shoulders, set your grip, and step back toward the stair. The lamp
                   id: "complete-park-survey",
                   name: "exact_quest_objective.select",
                   arguments: JSON.stringify({
-                    candidateId: tool.parameters.properties.candidateId.enum[0],
-                    digest: tool.parameters.properties.digest.enum[0],
+                    ...firstExactCandidate(input, "exact_quest_objective.select"),
                   }),
                 },
               ],
@@ -2348,8 +2348,7 @@ You roll your shoulders, set your grip, and step back toward the stair. The lamp
                 id: `quest-choice-${planningCalls}`,
                 name: "exact_quest_objective.select",
                 arguments: JSON.stringify({
-                  candidateId: tool.parameters.properties.candidateId.enum[0],
-                  digest: tool.parameters.properties.digest.enum[0],
+                  ...firstExactCandidate(input, "exact_quest_objective.select"),
                 }),
               },
             ],
@@ -2549,8 +2548,7 @@ You roll your shoulders, set your grip, and step back toward the stair. The lamp
                   id: "tampered-choice",
                   name: "exact_quest_objective.select",
                   arguments: JSON.stringify({
-                    candidateId: tool.parameters.properties.candidateId.enum[0],
-                    digest: tool.parameters.properties.digest.enum[0],
+                    ...firstExactCandidate(input, "exact_quest_objective.select"),
                     objectiveId: "tamper-objective",
                   }),
                 },

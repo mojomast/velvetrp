@@ -16,28 +16,21 @@ export function labelCandidate<T extends { candidateId: string; digest: string }
 }
 
 export function exactPairParameters(
-  candidates: readonly LabeledCandidate<{ candidateId: string; digest: string }>[],
+  _candidates: readonly LabeledCandidate<{ candidateId: string; digest: string }>[],
   idKey = "candidateId",
   digestKey = "digest",
 ): Record<string, CompletionJsonValue> {
   return {
     type: "object",
     properties: {
-      [idKey]: { type: "string", enum: candidates.map((candidate) => candidate.candidateId) },
-      [digestKey]: { type: "string", enum: candidates.map((candidate) => candidate.digest) },
+      [idKey]: {
+        type: "string",
+        description: "candidateId copied exactly from one row of the exact candidate table",
+      },
+      [digestKey]: { type: "string", description: "digest copied exactly from the same row" },
     },
     required: [idKey, digestKey],
     additionalProperties: false,
-    oneOf: candidates.map((candidate) => ({
-      type: "object",
-      description: "Select this exact server-issued candidate binding.",
-      properties: {
-        [idKey]: { type: "string", const: candidate.candidateId },
-        [digestKey]: { type: "string", const: candidate.digest },
-      },
-      required: [idKey, digestKey],
-      additionalProperties: false,
-    })),
   };
 }
 
