@@ -37,9 +37,7 @@ import {
 import { openSse, type SseWriter } from "../../roleplay/generationService.js";
 import {
   adventureProviderPromptEstimate,
-  createAdventureTurnBudgetPolicy,
   effectiveAdventureTurnMaxTokens,
-  initializeAdventureTurnBudget,
   orchestrateAdventureTurn,
   declarationIntent,
   type AdventureAgentDependencies,
@@ -51,7 +49,8 @@ import { getPromptPreset } from "../../../presets.js";
 import { adventureNarrationMessages, conversationNarrationMessages } from "../../../agent/adventurePrompt.js";
 import { buildActorStateContext, type ActorStateContext } from "../../../agent/actorStateContext.js";
 import { isRoutineObservationDeclaration } from "../../../agent/declarationAttempt.js";
-import { adventureTurnBudgets } from "../../../agent/turnBudget.js";
+import { adventureTurnBudgets, type TurnBudgetPolicy } from "../../../agent/turnBudget.js";
+import { createNarrationTurnBudgetPolicy, narrationTurnBudgetKey } from "../../../agent/narrationBudget.js";
 import { DIRECT_TOOL_BODY_OVERRIDES } from "../../../agent/directToolReasoning.js";
 import type {
   CompletionFunctionTool,
@@ -1642,6 +1641,28 @@ function narrationFailureSettlement(
 ): { usage: NarrationUsage } | { promptText: string; completionText: string } | Record<string, never> {
   return results.length === 0 ? {} : narrationBudgetSettlement(results, promptText);
 }
+const NARRATION_PROVIDER_CALL_PREFIX = "narration-provider:";
+function initializeNarrationTurnBudget(turn: PrivateAdventureTurn, budgetKey: string, policy: TurnBudgetPolicy): void {
+  adventureTurnBudgets.initialize(
+    budgetKey,
+    policy,
+    turn.providerCalls
+      .filter(
+        (call) =>
+          call.callId.startsWith(NARRATION_PROVIDER_CALL_PREFIX) &&
+          call.phase !== "started" &&
+          call.promptTokens !== null &&
+          call.completionTokens !== null,
+      )
+      .map((call) => ({
+        promptTokens: call.promptTokens!,
+        completionTokens: call.completionTokens!,
+        totalTokens: call.promptTokens! + call.completionTokens!,
+        source: call.outcomeCode?.endsWith("-estimated") ? ("estimated" as const) : ("provider" as const),
+        startedAtMs: new Date(call.recordedAt).getTime(),
+      })),
+  );
+}
 /** A thinking-mode upstream rejects a forced named tool choice with HTTP 400; `auto` is accepted. */
 function isThinkingModeToolChoiceRejection(error: unknown): boolean {
   return (
@@ -2083,22 +2104,31 @@ async function performNarration(
     }
     return recordFallback(fallbackText, "provider-error");
   }
-  const policy = createAdventureTurnBudgetPolicy(provider);
-  if (policy) initializeAdventureTurnBudget(turn, policy);
-  const budget = policy
-    ? adventureTurnBudgets.reserve(
-        turn.turnId,
-        policy,
-        {
-          id: callId,
-          promptText: adventureProviderPromptEstimate(completionInput),
-          maxCompletionTokens: completionLimit,
-        },
-        Date.now(),
-      )
-    : null;
+  const plannerBudgetDenial = turn.providerCalls.find(
+    (call) => !call.callId.startsWith(NARRATION_PROVIDER_CALL_PREFIX) && call.outcomeCode?.startsWith("budget-"),
+  )?.outcomeCode;
+  const policy = createNarrationTurnBudgetPolicy(provider);
+  const budgetKey = narrationTurnBudgetKey(turn.turnId);
+  if (policy) initializeNarrationTurnBudget(turn, budgetKey, policy);
+  const budget =
+    policy && !plannerBudgetDenial
+      ? adventureTurnBudgets.reserve(
+          budgetKey,
+          policy,
+          {
+            id: callId,
+            promptText: adventureProviderPromptEstimate(completionInput),
+            maxCompletionTokens: completionLimit,
+          },
+          Date.now(),
+        )
+      : null;
   if (!budget?.allowed) {
-    const reason = budget ? budget.reason : "pricing-unconfigured";
+    const reason = plannerBudgetDenial
+      ? plannerBudgetDenial.slice("budget-".length)
+      : budget
+        ? budget.reason
+        : "pricing-unconfigured";
     claim = repo.settleNarrationProviderDispatch(principalId, {
       turnId: turn.turnId,
       callId,
@@ -2203,7 +2233,7 @@ async function performNarration(
     )
       throw new Error("narration ruleset context is stale");
     const charged = adventureTurnBudgets.settle(
-      turn.turnId,
+      budgetKey,
       callId,
       narrationBudgetSettlement(consumed, promptTextEstimate),
     );
@@ -2237,7 +2267,7 @@ async function performNarration(
     }
     if (!budgetSettled) {
       const charged = adventureTurnBudgets.settle(
-        turn.turnId,
+        budgetKey,
         callId,
         narrationFailureSettlement(consumed, promptTextEstimate),
       );
@@ -2924,7 +2954,10 @@ async function stream(
     }
   } finally {
     if (heartbeat) clearInterval(heartbeat);
-    if (terminal) adventureTurnBudgets.clear(initial.turnId);
+    if (terminal) {
+      adventureTurnBudgets.clear(initial.turnId);
+      adventureTurnBudgets.clear(narrationTurnBudgetKey(initial.turnId));
+    }
     if (!reply.raw.destroyed && !reply.raw.writableEnded) writer?.end();
   }
 }

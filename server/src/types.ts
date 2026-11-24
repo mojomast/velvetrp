@@ -362,6 +362,7 @@ export interface UpdateProviderInput {
 
 export interface AdventureTurnBudgetSettings {
   maxTotalTokens: number;
+  maxNarrationTokens?: number;
   maxEstimatedCostUsd: number | null;
 }
 
