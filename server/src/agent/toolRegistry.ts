@@ -495,12 +495,15 @@ export function selectAdventureTools(
         (candidate.targetId === null ||
           (typeof candidate.targetLabel === "string" && candidate.targetLabel.trim().length > 0)),
     ) ?? [];
-  const names: AdventureRegistryToolName[] = ["campaign_context.read", "world_state.read", "quest_state.read"];
-  if (snapshot.encounter) names.push("combat_state.read");
+  const names: AdventureRegistryToolName[] = [];
+  // Outside combat the planner is single-round: every contextual read is already verbatim in its
+  // prompt, so advertising reads only invites a second round that the turn budget refuses.
+  if (snapshot.encounter)
+    names.push("campaign_context.read", "world_state.read", "quest_state.read", "combat_state.read");
   const actorAudience =
     snapshot.audience.kind === "player" && snapshot.audience.actorId === snapshot.encounter?.currentActorId;
   const controlsActor = snapshot.audience.kind === "player" && snapshot.authority.control !== "none";
-  if (controlsActor)
+  if (controlsActor && snapshot.encounter)
     names.push("actor_sheet.read", "actor_resources.read", "actor_inventory.read", "actor_powers.read");
   // Generic actor mutations are deliberately absent during combat: combat permits
   // only the exact action plans returned by the authoritative planner.

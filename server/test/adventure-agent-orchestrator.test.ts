@@ -216,18 +216,10 @@ describe("server-selected adventure tool registry", () => {
     ...patch,
   });
 
-  it("selects actor reads and limited mutations only with control outside combat", () => {
+  it("selects limited mutations only with control outside combat, and no read tools (round 9 change A)", () => {
     const names = selectAdventureTools(snapshot()).map((tool) => tool.name);
-    expect(names).toEqual(
-      expect.arrayContaining([
-        "actor_sheet.read",
-        "actor_resources.read",
-        "actor_inventory.read",
-        "actor_powers.read",
-        "actor_attribute.set",
-        "actor_dice.roll",
-      ]),
-    );
+    expect(names).toEqual(expect.arrayContaining(["actor_attribute.set", "actor_dice.roll"]));
+    expect(names.filter((name) => name.endsWith(".read"))).toEqual([]);
     expect(names).not.toContain("actor_resource.initialize");
     expect(ADVENTURE_TOOL_LIMITATIONS.join(" ")).toMatch(/Deletion.*SQL.*network/i);
   });
@@ -1801,7 +1793,7 @@ describe("bounded adventure orchestrator", () => {
     ).toContainEqual(expect.objectContaining({ commandAttributeId: "strength", currentValue: 10 }));
     repository.close();
   });
-  it("persists read rounds, executes a deterministic dice command, and links its receipt", async () => {
+  it("executes a deterministic dice command in one planner round (no read rounds outside combat, round 9 change A), and links its receipt", async () => {
     const campaign = seed();
     const repository = createRepository();
     const created = repository.createAdventureTurn("local-owner", {
@@ -1816,19 +1808,15 @@ describe("bounded adventure orchestrator", () => {
     const result = await orchestrateAdventureTurn(
       repository,
       created.turnId,
-      dependencies([
-        completion([{ id: "read-1", name: "actor_resources.read", arguments: "{}" }]),
-        completion([{ id: "roll-1", name: "actor_dice.roll", arguments: '{"expression":"1d20"}' }]),
-      ]),
+      dependencies([completion([{ id: "roll-1", name: "actor_dice.roll", arguments: '{"expression":"1d20"}' }])]),
     );
     expect(result.outcome).toBe("mechanics-committed");
     expect(result.turn.toolCalls).toHaveLength(1);
     expect(result.turn.toolCalls[0]).toMatchObject({ status: "committed", proposal: { toolName: "roll_actor_dice" } });
     expect(result.turn.receiptLinks).toHaveLength(1);
     const planning = repository.getDurableAgentPlanningState("local-owner", created.turnId)!;
-    expect(planning.decisionRounds).toBe(2);
-    expect(planning.providerStarts).toBe(2);
-    expect(planning.toolCalls.find((call) => call.providerToolCallId === "read-1")?.status).toBe("read-succeeded");
+    expect(planning.decisionRounds).toBe(1);
+    expect(planning.providerStarts).toBe(1);
     repository.close();
   });
 
