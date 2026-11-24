@@ -158,7 +158,7 @@ const deps = (
   getHarness: async () => defaultHarnessSettings(),
   now: () => new Date(at),
   complete: async (input) => {
-    expect((input.tools?.find((value) => value.name === tool)?.parameters.oneOf as any[])[0].required).toEqual([
+    expect((input.tools?.find((value) => value.name === tool)?.parameters as any).required).toEqual([
       "candidateId",
       "digest",
     ]);

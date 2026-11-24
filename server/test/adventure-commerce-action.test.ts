@@ -165,7 +165,7 @@ const deps = (candidate: { candidateId: string; digest: string }): AdventureAgen
   now: () => new Date(at),
   complete: async (input) => {
     const parameters = input.tools?.find((value) => value.name === "exact_vendor_commerce.select")?.parameters as any;
-    expect(parameters.oneOf[0].required).toEqual(["candidateId", "digest"]);
+    expect(parameters.required).toEqual(["candidateId", "digest"]);
     return {
       message: {
         role: "assistant",

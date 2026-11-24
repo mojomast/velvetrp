@@ -58,3 +58,13 @@ export function recordingProvider(plan: (input: ProviderCompletionInput, round: 
   };
   return { dependencies, planner };
 }
+
+/** First advertised row for a tool, read from the candidate table (provider schemas no longer list candidates). */
+export function firstExactCandidate(
+  input: ProviderCompletionInput,
+  toolName: string,
+): { candidateId: string; digest: string } {
+  const row = candidateTable(input).find((option) => option.toolName === toolName);
+  if (!row) throw new Error(`no ${toolName} row in the candidate table`);
+  return { candidateId: row.arguments.candidateId, digest: row.arguments.digest };
+}
