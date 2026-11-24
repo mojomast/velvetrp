@@ -1,0 +1,507 @@
+{
+  "version": "hermes-nous-v3-party",
+  "campaign": "hermes-agent-squad-v3",
+  "targetLevel": 3,
+  "shape": "HeroSpec (server/src/quickstart/sintermarkParty.ts) + personaProfileSchema profile; subclassDefinitionId, knownCantrips, tabletopSpells, boundaries and sources are documentation for a future party module.",
+  "scoreNote": "Standard-ish scores (top 18). Kyle to choose boosted vs standard.",
+  "heroes": [
+    {
+      "key": "teknium",
+      "name": "Teknium",
+      "age": 33,
+      "archetype": "Human evocation wizard; Head Honcho and architect of the Hermes Agent Squad",
+      "ancestryDefinitionId": "srd-5.1:race:human",
+      "classDefinitionId": "srd-5.1:class:wizard",
+      "subclassDefinitionId": "srd-5.1:subclass:school-of-evocation",
+      "primaryAttribute": "intelligence",
+      "preparedSpells": ["srd-5.1:spell:magic-missile", "srd-5.1:spell:false-life", "srd-5.1:spell:shield"],
+      "knownCantrips": ["srd-5.1:spell:fire-bolt", "srd-5.1:spell:ray-of-frost"],
+      "tabletopSpells": [],
+      "targetScores": {
+        "intelligence": 18,
+        "dexterity": 16,
+        "constitution": 14,
+        "wisdom": 14,
+        "charisma": 12,
+        "strength": 10
+      },
+      "battlePowers": [
+        "srd-5.1:spell:fire-bolt",
+        "srd-5.1:spell:ray-of-frost",
+        "srd-5.1:spell:magic-missile",
+        "srd-5.1:spell:false-life",
+        "srd-5.1:spell:shield"
+      ],
+      "componentNotes": "Fully executable caster. Fire Bolt and Ray of Frost run in the combat-power lane only.",
+      "reactionConstraints": "Shield is a reaction, resolved at hit time.",
+      "instancedItems": [
+        {
+          "definitionId": "srd-5.1:item:quarterstaff",
+          "equip": {
+            "slot": "hand",
+            "hand": "main",
+            "grip": "one-handed"
+          }
+        },
+        {
+          "definitionId": "srd-5.1:item:leather-armor",
+          "equip": {
+            "slot": "body"
+          }
+        },
+        {
+          "definitionId": "srd-5.1:item:dagger"
+        },
+        {
+          "definitionId": "srd-5.1:item:component-pouch"
+        },
+        {
+          "definitionId": "srd-5.1:item:spellbook"
+        },
+        {
+          "definitionId": "srd-5.1:item:wand-of-magic-missiles"
+        },
+        {
+          "definitionId": "srd-5.1:item:ring-of-protection"
+        }
+      ],
+      "stackableItems": [
+        {
+          "definitionId": "srd-5.1:item:potion-of-healing",
+          "quantity": 3
+        },
+        {
+          "definitionId": "srd-5.1:item:rations",
+          "quantity": 5
+        }
+      ],
+      "attunementItems": ["srd-5.1:item:wand-of-magic-missiles", "srd-5.1:item:ring-of-protection"],
+      "boundaries": "Real community member's public NRCU persona, written affectionately: heroic, competent, never humiliated. No invented private life, job, politics, money or relationships beyond the archive. Class, powers and dialogue are fiction.",
+      "sources": [
+        "NRCU characters/teknium.md (Head Honcho, Leader/Architect; green leafage hair; connected red triangular shades)",
+        "NRCU scenes ask-hermes, campfire, carnival, beach-finale",
+        "Thank You Nous Research ~01:50 (Lighthouse ops room)",
+        "teknium.io: Cofounder & Lead Engineer, Hermes Agent (public fact)"
+      ],
+      "profile": {
+        "goal": "Keep everything the community builds open, shippable and fixable, and get Hermes' sealed skills back before the Hackathon ends.",
+        "ideal": "We build, we share, we never surrender. Good tools belong to the people who use them.",
+        "bond": "He leads the Hermes Agent Squad from the Hellcarrier and keeps the Lighthouse lit for anyone asking Hermes for help.",
+        "flaw": "Wants to be the leader who never needs rescuing; takes responsibility for every outcome and forgets to hand off the wheel.",
+        "history": "The squad's green-haired architect. From the Lighthouse Tower he answers calls from all over the world, and aboard the Hellcarrier he sets the squad's direction. He is brilliant and outspoken, fearless in debate, and sharp with words, and he believes the answer to a closed system is a better open one.",
+        "personality": "Confident, quick, mischievous grin, endlessly curious. Thinks in systems and strategy. Argues hard, then ships.",
+        "fears": "That a sealed black box becomes the only way anyone can get help.",
+        "relationships": "Stands back-to-back with Sovthpaw at the ASK HERMES panel. Trusts Nous Girl to say when he's wrong. Respects Molty as a rival. Hermes is his partner, not his tool.",
+        "appearance": "Spiky bright-green hair with leafage, one connected sheet of red triangular shades with white shimmer, green or blue jacket, a glowing tablet in hand.",
+        "voice": "Fast, direct, cheeky. 'Ship it.' 'Ask Hermes.' Gets formal only when someone is in danger."
+      }
+    },
+    {
+      "key": "sovthpaw",
+      "name": "Sovthpaw",
+      "age": 38,
+      "archetype": "Human berserker; left-handed bass guitarist, moderator and local-model guru (a.k.a. TurboFit)",
+      "ancestryDefinitionId": "srd-5.1:race:human",
+      "classDefinitionId": "srd-5.1:class:barbarian",
+      "subclassDefinitionId": "srd-5.1:subclass:path-of-the-berserker",
+      "primaryAttribute": "strength",
+      "preparedSpells": [],
+      "tabletopSpells": [],
+      "targetScores": {
+        "strength": 18,
+        "constitution": 16,
+        "dexterity": 14,
+        "wisdom": 12,
+        "charisma": 12,
+        "intelligence": 10
+      },
+      "battlePowers": [],
+      "componentNotes": "No spells. Bass guitar is a greatclub (non-lethal by choice). Rage tracked as a resource.",
+      "reactionConstraints": "None executable.",
+      "instancedItems": [
+        {
+          "definitionId": "srd-5.1:item:greatclub",
+          "equip": {
+            "slot": "hand",
+            "hand": "main",
+            "grip": "two-handed"
+          }
+        },
+        {
+          "definitionId": "srd-5.1:item:leather-armor",
+          "equip": {
+            "slot": "body"
+          }
+        },
+        {
+          "definitionId": "srd-5.1:item:handaxe"
+        },
+        {
+          "definitionId": "srd-5.1:item:javelin"
+        },
+        {
+          "definitionId": "srd-5.1:item:gauntlets-of-ogre-power"
+        }
+      ],
+      "stackableItems": [
+        {
+          "definitionId": "srd-5.1:item:potion-of-healing",
+          "quantity": 3
+        },
+        {
+          "definitionId": "srd-5.1:item:rations",
+          "quantity": 5
+        },
+        {
+          "definitionId": "srd-5.1:item:torch",
+          "quantity": 5
+        }
+      ],
+      "attunementItems": ["srd-5.1:item:gauntlets-of-ogre-power"],
+      "boundaries": "Real community member's public NRCU persona, written affectionately: heroic, competent, never humiliated. No invented private life, job, politics, money or relationships beyond the archive. Class, powers and dialogue are fiction. The archive calls him a father; keep family offscreen.",
+      "sources": [
+        "NRCU characters/turbo-fit.md (Sovthpaw primary name; TurboFit alias; left-handed guitarist; moderator; local-model guru; weapon Bass Guitar (Non-Lethal) / NVIDIA Blackwell 6000)",
+        "github.com/SouthpawIN/turbofit (public project)",
+        "NRCU squad/roster.md",
+        "drahcir-rahl.md (friendship)"
+      ],
+      "profile": {
+        "goal": "Keep the community's machines running on the hardware people already own, and keep the crowd safe while he does it.",
+        "ideal": "Open source for all. Any machine, any home, any player deserves a seat at the table.",
+        "bond": "He moderates the Nous Commons and keeps the Hellcarrier's engines tuned; the community knows he never stops working.",
+        "flaw": "Very particular opinions about his guitars and his rigs; charges in first and plays the loudest solo when the moment needs a supporting note.",
+        "history": "A rogue builder who fights closed systems and corporate control with cutting-edge hardware and open-source conviction. A mosh-pit regular and left-handed bass player, he can get a model running on almost anything. His friendship with drahcir_rahl began with a forceful reminder to keep the chat organised.",
+        "personality": "Loud, warm, unfazed, relentless. Keeps going when everyone else has stopped. Teases hard, protects harder.",
+        "fears": "A city where only sealed towers can think and the small machines go dark.",
+        "relationships": "Teknium's back-to-back partner. Friends with drahcir_rahl. Hypes Nous Girl's broadcasts. Takes Don Piedro's kart challenges and loses.",
+        "appearance": "Long auburn hair, dark shades, a distressed sleeveless top or open plaid flannel, tactical trousers, an NR pendant, and a left-handed bass slung low.",
+        "voice": "Big, easy laugh; rock-show cadence. 'Turn it up.' 'Runs on my rig.'"
+      }
+    },
+    {
+      "key": "nousgirl",
+      "name": "Nous Girl",
+      "age": 20,
+      "archetype": "Half-elf Lore bard; the girl from the Nous logo, who carries the lantern",
+      "ancestryDefinitionId": "srd-5.1:race:half-elf",
+      "classDefinitionId": "srd-5.1:class:bard",
+      "subclassDefinitionId": "srd-5.1:subclass:college-of-lore",
+      "primaryAttribute": "charisma",
+      "preparedSpells": [],
+      "tabletopSpells": [
+        "srd-5.1:spell:vicious-mockery",
+        "srd-5.1:spell:healing-word",
+        "srd-5.1:spell:faerie-fire",
+        "srd-5.1:spell:sleep",
+        "srd-5.1:spell:thunderwave"
+      ],
+      "targetScores": {
+        "charisma": 18,
+        "dexterity": 16,
+        "constitution": 14,
+        "wisdom": 14,
+        "intelligence": 12,
+        "strength": 10
+      },
+      "battlePowers": [],
+      "componentNotes": "Bard spells are metadata-only in this engine; the GM narrates them.",
+      "reactionConstraints": "None executable.",
+      "instancedItems": [
+        {
+          "definitionId": "srd-5.1:item:rapier",
+          "equip": {
+            "slot": "hand",
+            "hand": "main",
+            "grip": "one-handed"
+          }
+        },
+        {
+          "definitionId": "srd-5.1:item:leather-armor",
+          "equip": {
+            "slot": "body"
+          }
+        },
+        {
+          "definitionId": "srd-5.1:item:dagger"
+        },
+        {
+          "definitionId": "srd-5.1:item:musical-instrument-lute"
+        },
+        {
+          "definitionId": "srd-5.1:item:lantern-of-revealing"
+        },
+        {
+          "definitionId": "srd-5.1:item:cloak-of-elvenkind"
+        }
+      ],
+      "stackableItems": [
+        {
+          "definitionId": "srd-5.1:item:potion-of-healing",
+          "quantity": 3
+        },
+        {
+          "definitionId": "srd-5.1:item:rations",
+          "quantity": 5
+        }
+      ],
+      "attunementItems": ["srd-5.1:item:cloak-of-elvenkind"],
+      "boundaries": "Fictional character from the Nous logo (logo by John Galt, 2023, per shivanimitra.com); not a real person. Capable lead, playful and kind; never sexualised. Distinct from Hermes.",
+      "sources": [
+        "NRCU characters/nous-girl.md (logo girl; bob, bangs, large over-ear headphones, collar, pendant, cyan eyes)",
+        "Thank You Nous Research ~02:00 (receives a lantern from Hermes User 123321; ee.dd on her shoulder)",
+        "season-one bible (headphone-study design chosen)"
+      ],
+      "profile": {
+        "goal": "Carry the lantern she was given to every district the Black Box seals, and get everyone home to the Hearth.",
+        "ideal": "Pass the light on. Knowledge only matters when someone else can carry it next.",
+        "bond": "A long-haired Hermes user (123321) gave her the lantern; ee.dd rides on her shoulder.",
+        "flaw": "Everyone expects her to be the reassuring symbol, so she hides when she's scared and says she's fine.",
+        "history": "She is the girl from the Nous logo, who stepped off the banner and into the squad. She hosts the Hellcarrier's broadcasts, knows the city's songs and stories by heart, and keeps a lantern lit that she was handed by a stranger.",
+        "personality": "Quick, bright, funny and observant; goes quiet and exact under pressure. Chooses what to protect and whom to trust.",
+        "fears": "Becoming a logo again: a face everyone looks at and nobody talks to.",
+        "relationships": "ee.dd is her silent shadow. Suzu might be her smaller older sister; neither will confirm. Teases Teknium, harmonises with Sovthpaw, adopts Don Piedro as a little brother.",
+        "appearance": "Glossy black bob with upward curls and straight bangs, large over-ear headphones, white collared shirt under a dark sleeveless layer, small pendant, cyan eyes, a warm lantern.",
+        "voice": "Warm, quick, a little wry. Signs off broadcasts with 'stay open'."
+      }
+    },
+    {
+      "key": "donpiedro",
+      "name": "Don Piedro",
+      "age": 24,
+      "archetype": "Lightfoot halfling thief; a teddy-bear speedster in cobalt armour and Hermes' biggest fanboy",
+      "ancestryDefinitionId": "srd-5.1:race:lightfoot-halfling",
+      "classDefinitionId": "srd-5.1:class:rogue",
+      "subclassDefinitionId": "srd-5.1:subclass:thief",
+      "primaryAttribute": "dexterity",
+      "preparedSpells": [],
+      "tabletopSpells": [],
+      "targetScores": {
+        "dexterity": 18,
+        "constitution": 14,
+        "charisma": 14,
+        "wisdom": 12,
+        "intelligence": 12,
+        "strength": 10
+      },
+      "battlePowers": [],
+      "componentNotes": "No spells. Sneak Attack is metadata-only; the GM rules on it.",
+      "reactionConstraints": "None executable.",
+      "instancedItems": [
+        {
+          "definitionId": "srd-5.1:item:shortsword",
+          "equip": {
+            "slot": "hand",
+            "hand": "main",
+            "grip": "one-handed"
+          }
+        },
+        {
+          "definitionId": "srd-5.1:item:leather-armor",
+          "equip": {
+            "slot": "body"
+          }
+        },
+        {
+          "definitionId": "srd-5.1:item:dagger"
+        },
+        {
+          "definitionId": "srd-5.1:item:light-crossbow"
+        },
+        {
+          "definitionId": "srd-5.1:item:thieves-tools"
+        },
+        {
+          "definitionId": "srd-5.1:item:boots-of-speed"
+        }
+      ],
+      "stackableItems": [
+        {
+          "definitionId": "srd-5.1:item:crossbow-bolts",
+          "quantity": 20
+        },
+        {
+          "definitionId": "srd-5.1:item:potion-of-healing",
+          "quantity": 3
+        },
+        {
+          "definitionId": "srd-5.1:item:rations",
+          "quantity": 5
+        }
+      ],
+      "attunementItems": ["srd-5.1:item:boots-of-speed"],
+      "boundaries": "NRCU community cameo; no separate identity, employment or private biography inferred. Comic, earnest speedster, broken English per the season-one bible; no crime-boss backstory.",
+      "sources": [
+        "NRCU characters/don-piedro.md (brown teddy bear, white/cobalt armour with gold, red mechanical eye piece; ~01:08 night kart race passing GottZ and TunaCookie)",
+        "'Hermes Biggest Fanboy' fan-art label (archive)",
+        "season-one bible (wants his heroes to notice him; broken English)"
+      ],
+      "profile": {
+        "goal": "Get to every emergency first, and have Hermes say his name.",
+        "ideal": "Fast is good. Fast for friends is better.",
+        "bond": "He is Hermes' biggest fanboy and the fastest kart on the Night Circuit.",
+        "flaw": "Thinks arriving first is the same as belonging; races off before the plan is finished.",
+        "history": "A small brown teddy bear in white and cobalt armour with gold trim and a red mechanical eye piece. Nobody beats him on the Night Kart Circuit, and GottZ and TunaCookie can confirm it. He signed up for the squad because he wanted his heroes to notice him, and he's learning that the speedster who stays is the one people depend on.",
+        "personality": "Earnest, cheeky, fearless, very loud for his size. Generous with snacks and terrible with patience.",
+        "fears": "Hermes forgetting who he is.",
+        "relationships": "Idolises Hermes and Teknium. Nous Girl treats him like a little brother. Races Sovthpaw and always wins. Waves at GottZ and TunaCookie in his mirrors.",
+        "appearance": "Brown teddy bear, white-and-cobalt armour with gold accents, red mechanical visor eye, determined expression, a low racing kart.",
+        "voice": "Short, cheeky broken English. 'I am Hermes biggest fanboy.' 'I no walk on confidence. I drive.'"
+      }
+    },
+    {
+      "key": "heartbreaker",
+      "name": "Heartbreaker",
+      "age": 27,
+      "archetype": "Human Life cleric; open-source rebel, builder and believer (Brooklyn)",
+      "ancestryDefinitionId": "srd-5.1:race:human",
+      "classDefinitionId": "srd-5.1:class:cleric",
+      "subclassDefinitionId": "srd-5.1:subclass:life-domain",
+      "primaryAttribute": "wisdom",
+      "preparedSpells": ["srd-5.1:spell:bless", "srd-5.1:spell:cure-wounds", "srd-5.1:spell:healing-word"],
+      "tabletopSpells": [],
+      "targetScores": {
+        "wisdom": 18,
+        "charisma": 16,
+        "constitution": 14,
+        "dexterity": 14,
+        "intelligence": 12,
+        "strength": 10
+      },
+      "battlePowers": ["srd-5.1:spell:bless", "srd-5.1:spell:cure-wounds", "srd-5.1:spell:healing-word"],
+      "componentNotes": "Fully executable healer. Bless is area-targeted (out-of-combat lane).",
+      "reactionConstraints": "None.",
+      "instancedItems": [
+        {
+          "definitionId": "srd-5.1:item:mace",
+          "equip": {
+            "slot": "hand",
+            "hand": "main",
+            "grip": "one-handed"
+          }
+        },
+        {
+          "definitionId": "srd-5.1:item:chain-shirt",
+          "equip": {
+            "slot": "body"
+          }
+        },
+        {
+          "definitionId": "srd-5.1:item:shield",
+          "equip": {
+            "slot": "hand",
+            "hand": "off"
+          }
+        },
+        {
+          "definitionId": "srd-5.1:item:holy-symbol"
+        },
+        {
+          "definitionId": "srd-5.1:item:staff-of-healing"
+        },
+        {
+          "definitionId": "srd-5.1:item:periapt-of-wound-closure"
+        }
+      ],
+      "stackableItems": [
+        {
+          "definitionId": "srd-5.1:item:potion-of-healing",
+          "quantity": 4
+        },
+        {
+          "definitionId": "srd-5.1:item:rations",
+          "quantity": 5
+        }
+      ],
+      "attunementItems": ["srd-5.1:item:staff-of-healing", "srd-5.1:item:periapt-of-wound-closure"],
+      "boundaries": "Real community member's public NRCU persona, written affectionately: heroic, competent, never humiliated. No invented private life, job, politics, money or relationships beyond the archive. Class, powers and dialogue are fiction.",
+      "sources": [
+        "NRCU characters/heartbreaker.md (Open-Source Rebel - Builder/Believer; pink laptop; voluminous curly brown hair; pink heart dress)",
+        "NRCU squad roster; campfire/carnival/beach scenes",
+        "Thank You Nous Research ~00:40 (painting a Nous Girl poster)"
+      ],
+      "profile": {
+        "goal": "Unseal every tool the Black Box locked and make sure the people who were shut out get them back first.",
+        "ideal": "Fight closed systems with charm, code and conviction. Hearts on the outside, fire within.",
+        "bond": "She is the squad's community champion: she paints the posters, fixes the laptops and brings the cupcakes.",
+        "flaw": "Believes the best of everyone, including people who've earned none of it.",
+        "history": "A fearless builder and believer in open freedom. She fights closed systems with charm, code and conviction rather than force, and her sticker-covered pink laptop has patched more of the Hellcarrier than anyone will admit. She painted the Nous Girl poster in the workshop.",
+        "personality": "Warm, charismatic, upbeat and stubborn. Rallies crowds. Says the kind thing and the true thing together.",
+        "fears": "A community that stops sharing because someone made it afraid.",
+        "relationships": "Types beside Teknium at the campfire. Fixes Sovthpaw's rig after every show. Painted Nous Girl's poster. Feeds the coding monkeys at the Carnival.",
+        "appearance": "Voluminous curly brown hair, pink heart-patterned high-low dress, pink heels, rose-gold jewellery, and a pink laptop covered in heart and skull stickers.",
+        "voice": "Bright and teasing, then dead serious about open tools. 'Open it up, babe.'"
+      }
+    },
+    {
+      "key": "dogeman",
+      "name": "Doge Man",
+      "age": 30,
+      "archetype": "Human Open Hand monk; Shiba-faced brawler who is the projectile (Super Shiba)",
+      "ancestryDefinitionId": "srd-5.1:race:human",
+      "classDefinitionId": "srd-5.1:class:monk",
+      "subclassDefinitionId": "srd-5.1:subclass:way-of-the-open-hand",
+      "primaryAttribute": "dexterity",
+      "preparedSpells": [],
+      "tabletopSpells": [],
+      "targetScores": {
+        "dexterity": 18,
+        "wisdom": 16,
+        "constitution": 14,
+        "strength": 14,
+        "charisma": 12,
+        "intelligence": 10
+      },
+      "battlePowers": [],
+      "componentNotes": "No spells. Ki and Martial Arts are metadata-only; his torpedo charge is narrated.",
+      "reactionConstraints": "None executable.",
+      "instancedItems": [
+        {
+          "definitionId": "srd-5.1:item:quarterstaff",
+          "equip": {
+            "slot": "hand",
+            "hand": "main",
+            "grip": "one-handed"
+          }
+        },
+        {
+          "definitionId": "srd-5.1:item:dart"
+        },
+        {
+          "definitionId": "srd-5.1:item:bracers-of-defense"
+        },
+        {
+          "definitionId": "srd-5.1:item:cloak-of-protection"
+        }
+      ],
+      "stackableItems": [
+        {
+          "definitionId": "srd-5.1:item:potion-of-healing",
+          "quantity": 3
+        },
+        {
+          "definitionId": "srd-5.1:item:rations",
+          "quantity": 5
+        }
+      ],
+      "attunementItems": ["srd-5.1:item:bracers-of-defense", "srd-5.1:item:cloak-of-protection"],
+      "boundaries": "NRCU character created and shared by Mike (123mikeyd); the creator credit is real, the fighting role is fiction. No private life inferred.",
+      "sources": [
+        "NRCU characters/doge-man.md (Brawler: he is the projectile; sideways torpedo charge; red/blue clothing, silver gauntlets, golden cape)",
+        "sudo-nightwing.md (the Shiba super-doge handles aerial impacts in the Citadel defense)",
+        "season-one bible (holds an evacuation path)"
+      ],
+      "profile": {
+        "goal": "Hold the line for everyone getting out, and hit the Black Box Tower so hard it opens.",
+        "ideal": "If you can't throw something at the problem, throw yourself.",
+        "bond": "He's the squad's living cannonball, the Super Shiba who catches whatever falls from the sky.",
+        "flaw": "Every problem looks like a wall to fly through; he wears himself out holding paths open.",
+        "history": "Doge Man, Super Shiba and 123mikeyD are one character. His fighting style is close-range brawling, and his signature move sends him flying sideways into a fight like a torpedo. Instead of firing a projectile, he becomes one. Where his power comes from is still a mystery, even to him.",
+        "personality": "Exuberant, loyal, goofy, brave. Big entrances, bigger heart.",
+        "fears": "Being too tired to catch the next one.",
+        "relationships": "Holds the sky while sudo-nightwing holds the ground. Cheers loudest for Don Piedro. Gets pies thrown at him by monkeys, like Sovthpaw.",
+        "appearance": "Shiba-faced hero in red and blue, silver gauntlets, and a golden cape that streams behind him mid-torpedo.",
+        "voice": "Booming hype. 'Such open. Very hero. Wow.'"
+      }
+    }
+  ]
+}
