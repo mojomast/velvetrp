@@ -2,14 +2,28 @@ import { z } from "zod";
 import { resourceIdSchema } from "./domain-primitives.js";
 import { idempotencyKeySchema } from "./rpg-commands.js";
 
+/** The bundled, provider-free starter worlds a quick adventure can build, Sintermark first. */
+export const QUICK_ADVENTURE_IDS = ["sintermark", "hermes-nous"] as const;
+
+export const quickAdventureIdSchema = z.enum(QUICK_ADVENTURE_IDS);
+
+export type QuickAdventureId = z.infer<typeof quickAdventureIdSchema>;
+
+export const QUICK_ADVENTURE_OPTIONS: ReadonlyArray<{ id: QuickAdventureId; name: string }> = [
+  { id: "sintermark", name: "The Sintermark · A Commons of Fire" },
+  { id: "hermes-nous", name: "Hermes Agent Squad: We Never Surrender" },
+];
+
 /**
- * `POST /api/rpg/v1/quick-adventures` builds the bundled, provider-free Sintermark starter
- * world into the owner's existing database as a brand-new campaign and returns where to play.
- * Existing campaigns, characters and catalogs are never modified.
+ * `POST /api/rpg/v1/quick-adventures` builds a bundled, provider-free starter world into the
+ * owner's existing database as a brand-new campaign and returns where to play. Omitting
+ * `adventureId` builds Sintermark. Existing campaigns, characters and catalogs are never modified.
  */
 export const quickAdventureCreateRequestSchema = z
   .object({
     idempotencyKey: idempotencyKeySchema,
+    /** Which bundled world to build; defaults to Sintermark when omitted. */
+    adventureId: quickAdventureIdSchema.optional(),
   })
   .strict();
 

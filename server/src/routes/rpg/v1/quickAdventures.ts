@@ -118,10 +118,11 @@ export const quickAdventureHttpRoutes: FastifyPluginAsync<{ repositoryAccessor: 
       const build = (async (): Promise<CachedSuccess> => {
         const repository = options.repositoryAccessor();
         const databaseDir = databaseDirectoryOf(repository);
+        const adventure = parsed.data.adventureId ? { adventureId: parsed.data.adventureId } : {};
         const result =
           databaseDir !== null
-            ? await runQuickAdventureInWorker({ databaseDir, ownerId: PRINCIPAL })
-            : await createQuickAdventure({ repository, ownerId: PRINCIPAL });
+            ? await runQuickAdventureInWorker({ databaseDir, ownerId: PRINCIPAL, ...adventure })
+            : await createQuickAdventure({ repository, ownerId: PRINCIPAL, ...adventure });
         return quickAdventureCreateResponseSchema.parse({
           campaignId: result.campaignId,
           campaignName: result.campaignName,
