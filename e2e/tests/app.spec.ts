@@ -3161,7 +3161,8 @@ test("CampaignPlay sheet references remain draft-only until one explicit declara
   await expect(page.getByRole("region", { name: "Committed mechanics" })).toHaveCount(0);
   const afterStats = (await (await request.get("http://127.0.0.1:18788/stats")).json()) as typeof beforeStats;
   expect(afterStats.exactTravelSelections).toBe(beforeStats.exactTravelSelections);
-  expect(afterStats.actorSheetReads).toBe(beforeStats.actorSheetReads + 1);
+  // Round 9 change A: no read tools are advertised outside combat, so the planner no longer reads the sheet.
+  expect(afterStats.actorSheetReads).toBe(beforeStats.actorSheetReads);
   expect(afterStats.narrationResponses).toBeGreaterThan(beforeStats.narrationResponses);
   const contextStats = (await (await request.get("http://127.0.0.1:18788/stats")).json()) as {
     sheetContextRequests: Array<{ lane: string; entries: Array<{ label: string; value: string }> }>;
