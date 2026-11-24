@@ -113,7 +113,7 @@ describe("round 9 change C1: planner prompt size", () => {
     const ids = await startQuickAdventure(app);
     await playR8Turn(app, ids, "I look around the square.");
     expect(planner.length).toBeGreaterThan(0);
-    const bytes = adventureProviderPromptEstimate(planner[0]).length;
+    const bytes = adventureProviderPromptEstimate(planner[0]!).length;
     expect(bytes).toBeLessThan(BYTES_LIMIT);
   });
 });
