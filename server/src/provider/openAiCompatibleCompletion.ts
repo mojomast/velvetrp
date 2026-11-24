@@ -537,7 +537,9 @@ function parseResponse(
     : "unknown";
   const requiresToolCall = policy.toolChoice === "required" || typeof policy.toolChoice === "object";
   const hasResponseToolCalls =
-    isObject(choice.message) && Object.prototype.hasOwnProperty.call(choice.message, "tool_calls");
+    isObject(choice.message) &&
+    Object.prototype.hasOwnProperty.call(choice.message, "tool_calls") &&
+    choice.message.tool_calls !== null;
   if (
     (requiresToolCall || hasResponseToolCalls) &&
     (finishReason === "error" || finishReason === "length" || finishReason === "content_filter")
@@ -552,9 +554,10 @@ function parseResponse(
   if (hasContent && typeof message.content !== "string" && message.content !== null) {
     throw new ProviderProtocolError("Provider assistant content must be a string or null");
   }
-  const parsedToolCalls = Object.prototype.hasOwnProperty.call(message, "tool_calls")
-    ? parseToolCalls(message.tool_calls, policy)
-    : [];
+  const parsedToolCalls =
+    Object.prototype.hasOwnProperty.call(message, "tool_calls") && message.tool_calls !== null
+      ? parseToolCalls(message.tool_calls, policy)
+      : [];
   const toolCalls = parsedToolCalls.length > 0 ? parsedToolCalls : undefined;
   if ((!hasContent || message.content === null) && !toolCalls) {
     throw new ProviderProtocolError("Provider assistant message has neither content nor tool calls");
