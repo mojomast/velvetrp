@@ -125,7 +125,7 @@ async function execute(
     deps(async (input) => {
       const tool = input.tools?.find((entry) => entry.name === "exact_srd_check.select") as any;
       advertised = Boolean(tool);
-      expect(tool.parameters.oneOf[0].required).toEqual(["candidateId", "digest"]);
+      expect(tool.parameters.required).toEqual(["candidateId", "digest"]);
       expect(JSON.stringify(tool.parameters)).not.toMatch(/actorId|score|modifier|\"dc\"|result|revision/i);
       return completion({
         id: `call-${key}`,

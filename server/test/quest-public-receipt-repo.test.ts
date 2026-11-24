@@ -6,6 +6,7 @@ import { orchestrateAdventureTurn, type AdventureAgentDependencies } from "../sr
 import { defaultHarnessSettings, defaultProviderSettings } from "../src/defaults.js";
 import { createRepository } from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
+import { firstExactCandidate } from "./r9-planner-harness.js";
 
 useTmpDataDir();
 const at = "2035-01-01T00:00:00.000Z";
@@ -113,8 +114,7 @@ describe("adventure quest public receipt repository", () => {
                   id: "quest-choice",
                   name: "exact_quest_objective.select",
                   arguments: JSON.stringify({
-                    candidateId: tool.parameters.properties.candidateId.enum[0],
-                    digest: tool.parameters.properties.digest.enum[0],
+                    ...firstExactCandidate(input, "exact_quest_objective.select"),
                   }),
                 },
               ],
