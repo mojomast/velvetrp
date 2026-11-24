@@ -1602,6 +1602,9 @@ export function selectHeldRestCandidate<T extends { restKind: "short" | "long" }
 const DRINK_VERB =
   /\b(?:drink|drinks|drinking|drank|drunk|quaff|quaffs|quaffing|quaffed|swig|swigs|swigging|swigged|gulp|gulps|gulping|gulped|sip|sips|sipping|sipped)\b/u;
 const HEALING_POTION_LABEL = /\bpotion\b[\s\S]*\bheal|\bheal[\s\S]*\bpotion\b/iu;
+/** A trailing "if I have one" style remark on holding the item, not a hypothetical action. */
+const TRAILING_HELD_ITEM_CONDITION =
+  /(?:,\s*|\s+)if\s+(?:i\s+have\s+(?:one|it|any|some|a\s+potion)|i\s+have\s+got\s+(?:one|it|any|some)|i['’]ve\s+got\s+(?:one|it|any|some)|i\s+got\s+one|any|there\s+is\s+one|there\s+is\s+any|there\s+are\s+any|available)\s*\.?\s*$/iu;
 
 /**
  * The advertised consume candidate a clear drinking declaration names, or null. Only a held
@@ -1615,8 +1618,10 @@ export function selectHeldHealingPotionConsumeCandidate<T extends { action: stri
   declaration: string,
   candidates: readonly T[],
 ): T | null {
-  if (candidates.length === 0 || !isDirectDeclarationAttempt(declaration)) return null;
-  const text = normalized(declaration);
+  if (candidates.length === 0) return null;
+  const strippedDeclaration = declaration.replace(TRAILING_HELD_ITEM_CONDITION, "");
+  if (!isDirectDeclarationAttempt(strippedDeclaration)) return null;
+  const text = normalized(strippedDeclaration);
   if (!DRINK_VERB.test(text)) return null;
   if (!/\bpotion\b/u.test(text) && !/\bheal/u.test(text)) return null;
   const held = candidates.filter(
