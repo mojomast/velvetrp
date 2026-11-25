@@ -187,6 +187,9 @@ The API server does not serve the web client. `npm run build` writes static asse
 
 Keep the static listener and reverse proxy loopback-only as well. Do not set `HOST=0.0.0.0`, publish the API port, or expose it through a public proxy. Fixed `local-owner`, caller-header rejection, and the remote-authentication feature flag are not authentication.
 
+The isolated test stack in `deploy/velvetrp-test/` is the one documented exception. The app container shares the gateway container's network namespace, and Docker's published-port proxy forwards to the container interface address rather than to `127.0.0.1` in that namespace. In that setup only, the app binds `HOST=0.0.0.0` *inside* the namespace so the published port works. The published port itself stays loopback-only (and, when present, on a private tailnet address). Do not publish it on `0.0.0.0` on the host, and do not use this bind for a normal single-process install. `ROLLBACK.sh` in that directory restores only the app container and leaves the gateway and data volume in place.
+
+
 ## Recreate development data
 
 When a schema change requires a fresh database, do not delete the old one. Run the export helper against the data directory:
